@@ -1,5 +1,6 @@
-const BASE_URL =
-  "https://glare-legwork-snooper.ngrok-free.dev/api/nhom";
+import { API_URL } from "./config";
+
+const BASE_URL = `${API_URL}/api/nhom`;
 
 // =====================
 // GET LIST
