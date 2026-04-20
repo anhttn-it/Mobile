@@ -1,19 +1,18 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
-import { createStackNavigator } from "@react-navigation/stack";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import LoginScreen from "./screens/LoginScreen";
-import NhomScreen from "./screens/NhomScreen";
-
-const Stack = createStackNavigator();
+import AppNavigator from "./navigation/AppNavigator";
+import { AuthProvider } from "./context/AuthContext";
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Nhom" component={NhomScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <NavigationContainer>
+          <AppNavigator />
+        </NavigationContainer>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
