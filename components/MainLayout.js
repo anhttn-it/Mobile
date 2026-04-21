@@ -67,6 +67,16 @@ export default function MainLayout({ children, title, navigation }) {
           style={styles.menuItem}
           onPress={() => {
             toggleMenu();
+            navigation.navigate("DeThi");
+          }}
+        >
+          <Text>📚 Đề thi</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => {
+            toggleMenu();
             navigation.navigate("CauHoi");
           }}
         >
