@@ -11,7 +11,7 @@ import {
 
 import MainLayout from "../../../components/MainLayout";
 import { AuthContext } from "../../../context/AuthContext";
-import { getNhomGV } from "../../../api/quanlydiem";
+import { getMonHoc } from "../../../api/monhoc";
 
 export default function MonHocDiemScreen({ navigation }) {
   const { user } = useContext(AuthContext);
@@ -24,32 +24,19 @@ export default function MonHocDiemScreen({ navigation }) {
     load();
   }, [user]);
 
+  // =====================
+  // LOAD DATA
+  // =====================
   const load = async () => {
     if (!user?.userId) return;
 
     try {
       setLoading(true);
 
-      const res = await getNhomGV(user.userId);
+      // ✅ API đã return data trực tiếp
+      const data = await getMonHoc(user.userId);
 
-      if (!res.success) {
-        setMonHoc([]);
-        return;
-      }
-
-      // 👉 lọc môn học từ danh sách nhóm
-      const unique = [];
-
-      res.data.forEach((n) => {
-        if (!unique.find((m) => m.MaMonHoc === n.MaMonHoc)) {
-          unique.push({
-            MaMonHoc: n.MaMonHoc,
-            TenMonHoc: n.TenMonHoc,
-          });
-        }
-      });
-
-      setMonHoc(unique);
+      setMonHoc(data || []);
     } catch (err) {
       console.log("❌ load môn lỗi:", err);
       setMonHoc([]);
@@ -58,12 +45,18 @@ export default function MonHocDiemScreen({ navigation }) {
     }
   };
 
+  // =====================
+  // REFRESH
+  // =====================
   const onRefresh = async () => {
     setRefreshing(true);
     await load();
     setRefreshing(false);
   };
 
+  // =====================
+  // ITEM
+  // =====================
   const renderItem = ({ item }) => (
     <TouchableOpacity
       style={styles.card}
@@ -90,7 +83,7 @@ export default function MonHocDiemScreen({ navigation }) {
             <Text>Đang tải...</Text>
           </View>
         ) : monHoc.length === 0 ? (
-          // ✅ EMPTY STATE CHUẨN
+          // EMPTY
           <View style={styles.center}>
             <Text style={styles.emptyIcon}>📘</Text>
 
@@ -102,7 +95,6 @@ export default function MonHocDiemScreen({ navigation }) {
               Bạn cần tạo môn học trước khi tạo lớp
             </Text>
 
-            {/* 👉 NÚT CHUẨN */}
             <TouchableOpacity
               style={styles.createBtn}
               onPress={() => navigation.navigate("MonHoc")}
