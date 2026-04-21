@@ -3,82 +3,141 @@ import { API_URL } from "./config";
 const BASE_URL = `${API_URL}/api/nhom`;
 
 // =====================
-// GET LIST
+// HELPER FETCH (CHỐNG NGROK + JSON ERROR)
 // =====================
-export const getNhom = async () => {
-  const res = await fetch(BASE_URL, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-  });
+const safeFetch = async (url, options = {}) => {
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "ngrok-skip-browser-warning": "true", // 🔥 FIX NGROK
+        ...(options.headers || {}),
+      },
+    });
 
-  if (!res.ok) {
     const text = await res.text();
-    console.log("GET ERROR:", text);
-    throw new Error("API lỗi getNhom");
-  }
 
-  return await res.json();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.log("❌ JSON ERROR:", text);
+      throw new Error("Server trả về dữ liệu không hợp lệ");
+    }
+
+    if (!res.ok) {
+      console.log("❌ API ERROR:", data);
+      throw new Error(data?.Message || "Request thất bại");
+    }
+
+    return data;
+  } catch (err) {
+    console.log("❌ NETWORK ERROR:", err.message);
+    throw new Error("Không thể kết nối server");
+  }
 };
 
 // =====================
-// JOIN CLASS
+// 1. GET NHÓM THEO USER
 // =====================
-export const joinNhom = async (maMoi, maNguoiDung) => {
-  const url = `${BASE_URL}/join?maMoi=${maMoi}&maNguoiDung=${maNguoiDung}`;
+export const getNhom = async (userId) => {
+  if (!userId) throw new Error("Thiếu userId");
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-    },
+  return safeFetch(`${BASE_URL}?userId=${userId}`, {
+    method: "GET",
   });
-
-  const data = await res.json();
-
-  if (!res.ok) {
-    console.log("JOIN ERROR:", data);
-    throw new Error("Join thất bại");
-  }
-
-  return data;
 };
 
 // =====================
-// CREATE CLASS
+// 2. CREATE NHÓM
 // =====================
-export const createNhom = async (data) => {
+export const createNhom = async ({ TenNhom, MaMonHoc, GiangVien }) => {
+  if (!TenNhom || !MaMonHoc || !GiangVien) {
+    throw new Error("Thiếu dữ liệu tạo nhóm");
+  }
+
   const payload = {
-    TenNhom: data.TenNhom?.trim(),
-    MaMonHoc: parseInt(data.MaMonHoc),
-
-    // FIX BẮT BUỘC THEO DB
-    GiangVien: data.GiangVien || "1",
-
-    SiSo: 0,
-    TrangThai: true,
-    HienThi: 1,
+    TenNhom: TenNhom.trim(),
+    MaMonHoc: parseInt(MaMonHoc),
+    GiangVien,
   };
 
-  console.log("SEND CREATE:", payload);
+  console.log("📤 CREATE NHOM:", payload);
 
-  const res = await fetch(BASE_URL, {
+  return safeFetch(`${BASE_URL}/create`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
     body: JSON.stringify(payload),
   });
+};
 
-  const result = await res.json();
-
-  if (!res.ok) {
-    console.log("CREATE ERROR:", result);
-    throw new Error("Create failed");
+// =====================
+// 3. JOIN NHÓM
+// =====================
+export const joinNhom = async (maMoi, maNguoiDung) => {
+  if (!maMoi || !maNguoiDung) {
+    throw new Error("Thiếu mã mời hoặc user");
   }
 
-  return result;
+  return safeFetch(
+    `${BASE_URL}/join?maMoi=${maMoi}&maNguoiDung=${maNguoiDung}`,
+    {
+      method: "POST",
+    }
+  );
+};
+
+// =====================
+// 4. CHI TIẾT NHÓM
+// =====================
+export const getNhomDetail = async (id) => {
+  if (!id) throw new Error("Thiếu id nhóm");
+
+  return safeFetch(`${BASE_URL}/${id}`, {
+    method: "GET",
+  });
+};
+
+// =====================
+// 5. XÓA NHÓM
+// =====================
+export const deleteNhom = async (id) => {
+  if (!id) throw new Error("Thiếu id");
+
+  return safeFetch(`${BASE_URL}/${id}`, {
+    method: "DELETE",
+  });
+};
+
+// =====================
+// 6. ADD STUDENT (EMAIL)
+// =====================
+export const addStudent = async (maNhom, email) => {
+  if (!maNhom || !email) {
+    throw new Error("Thiếu dữ liệu");
+  }
+
+  return safeFetch(
+    `${BASE_URL}/add-student?maNhom=${maNhom}&email=${email}`,
+    {
+      method: "POST",
+    }
+  );
+};
+
+// =====================
+// 7. REMOVE STUDENT
+// =====================
+export const removeStudent = async (maNhom, maNguoiDung) => {
+  if (!maNhom || !maNguoiDung) {
+    throw new Error("Thiếu dữ liệu");
+  }
+
+  return safeFetch(
+    `${BASE_URL}/remove-student?maNhom=${maNhom}&maNguoiDung=${maNguoiDung}`,
+    {
+      method: "DELETE",
+    }
+  );
 };

@@ -5,7 +5,7 @@ import HomeGV from "../screens/giangvien/HomeGV";
 // sau này thêm:
 // import ClassScreen from "../screens/giangvien/ClassScreen";
 // import ExamScreen from "../screens/giangvien/ExamScreen";
-import NhomScreen from "../screens/NhomScreen"; // 👈 thêm vào
+import NhomScreen from "../screens/giangvien/NhomScreen";
 
 const Stack = createStackNavigator();
 
