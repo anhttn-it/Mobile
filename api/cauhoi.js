@@ -58,26 +58,16 @@ export const getCauHoi = async (userId, maMonHoc = null, search = "") => {
 // =====================
 // 2. CREATE CÂU HỎI
 // =====================
-export const createCauHoi = async ({
-  NoiDung,
-  DoKho,
-  MaMonHoc,
-  dapAn,
-  dapAnDung,
-  userId,
-}) => {
-  if (!NoiDung || !DoKho || !MaMonHoc || !dapAn || !userId) {
+export const createCauHoi = async (payload) => {
+  if (
+    !payload.NoiDung ||
+    !payload.DoKho ||
+    !payload.MaMonHoc ||
+    !payload.dapAn ||
+    !payload.userId
+  ) {
     throw new Error("Thiếu dữ liệu câu hỏi");
   }
-
-  const payload = {
-    NoiDung: NoiDung.trim(),
-    DoKho: parseInt(DoKho),
-    MaMonHoc: parseInt(MaMonHoc),
-    dapAn,
-    dapAnDung,
-    userId,
-  };
 
   console.log("📤 CREATE CAUHOI:", payload);
 
@@ -86,7 +76,6 @@ export const createCauHoi = async ({
     body: JSON.stringify(payload),
   });
 };
-
 // =====================
 // 3. UPDATE CÂU HỎI
 // =====================
@@ -102,17 +91,19 @@ export const updateCauHoi = async ({
   if (!MaCauHoi) throw new Error("Thiếu MaCauHoi");
 
   const payload = {
-    MaCauHoi,
-    NoiDung,
-    DoKho,
-    MaMonHoc,
+    MaCauHoi: Number(MaCauHoi),
+    NoiDung: NoiDung?.trim(),
+    DoKho: Number(DoKho),
+    MaMonHoc: Number(MaMonHoc),
     dapAn,
-    dapAnDung,
+    dapAnDung: Number(dapAnDung),
     userId,
   };
 
+  console.log("📤 UPDATE:", payload);
+
   return safeFetch(`${BASE_URL}/update`, {
-    method: "PUT",
+    method: "POST",
     body: JSON.stringify(payload),
   });
 };
@@ -124,7 +115,7 @@ export const deleteCauHoi = async (id, userId) => {
   if (!id || !userId) throw new Error("Thiếu dữ liệu");
 
   return safeFetch(`${BASE_URL}/delete/${id}?userId=${userId}`, {
-    method: "DELETE",
+    method: "POST",
   });
 };
 
@@ -167,3 +158,15 @@ export const getCauHoiDetail = async (id, userId) => {
     method: "GET",
   });
 };
+
+
+
+export const getMonHocByUser = async (userId) => {
+  if (!userId) throw new Error("Thiếu userId");
+
+  return safeFetch(
+    `${BASE_URL}/monhoc?userId=${userId}`,
+    { method: "GET" }
+  );
+};
+
