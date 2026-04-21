@@ -4,129 +4,98 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
+  TextInput,
+  SafeAreaView,
+  StatusBar,
 } from "react-native";
 
-import MainLayout from "../../../components/MainLayout";
-import { AuthContext } from "../../../context/AuthContext";
 import { getMonHoc } from "../../../api/monhoc";
+import { AuthContext } from "../../../context/AuthContext";
 
 export default function MonHocDiemScreen({ navigation }) {
   const { user } = useContext(AuthContext);
 
-  const [monHoc, setMonHoc] = useState([]);
+  const [data, setData] = useState([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    load();
-  }, [user]);
-
-  // =====================
-  // LOAD DATA
-  // =====================
   const load = async () => {
-    if (!user?.userId) return;
-
     try {
-      setLoading(true);
-
-      // ✅ API đã return data trực tiếp
-      const data = await getMonHoc(user.userId);
-
-      setMonHoc(data || []);
+      const res = await getMonHoc(user.userId, "");
+      setData(res?.data || []);
     } catch (err) {
-      console.log("❌ load môn lỗi:", err);
-      setMonHoc([]);
+      setData([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // =====================
-  // REFRESH
-  // =====================
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
+  useEffect(() => {
+    load();
+  }, []);
 
-  // =====================
-  // ITEM
-  // =====================
-  const renderItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() =>
-        navigation.navigate("NhomTheoMon", {
-          maMonHoc: item.MaMonHoc,
-          tenMon: item.TenMonHoc,
-        })
-      }
-    >
-      <Text style={styles.name}>{item.TenMonHoc}</Text>
-      <Text style={styles.sub}>📘 Xem lớp học</Text>
-    </TouchableOpacity>
+  const filteredData = data.filter(item =>
+    item.TenMonHoc?.toLowerCase().includes(search.toLowerCase())
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.center}>
+        <Text>Đang tải môn học...</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <MainLayout title="📊 Chọn môn học" navigation={navigation}>
-      <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
 
-        {/* LOADING */}
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" />
-            <Text>Đang tải...</Text>
-          </View>
-        ) : monHoc.length === 0 ? (
-          // EMPTY
-          <View style={styles.center}>
-            <Text style={styles.emptyIcon}>📘</Text>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.back}>← Quay lại</Text>
+        </TouchableOpacity>
 
-            <Text style={styles.emptyTitle}>
-              Chưa có môn học
-            </Text>
-
-            <Text style={styles.emptySub}>
-              Bạn cần tạo môn học trước khi tạo lớp
-            </Text>
-
-            <TouchableOpacity
-              style={styles.createBtn}
-              onPress={() => navigation.navigate("MonHoc")}
-            >
-              <Text style={styles.createText}>
-                ➕ Tạo môn học
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          // LIST
-          <FlatList
-            data={monHoc}
-            keyExtractor={(item) => item.MaMonHoc.toString()}
-            renderItem={renderItem}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-          />
-        )}
-
+        <Text style={styles.title}>📚 Môn học (Điểm)</Text>
       </View>
-    </MainLayout>
+
+      {/* SEARCH */}
+      <TextInput
+        placeholder="🔍 Tìm môn học..."
+        value={search}
+        onChangeText={setSearch}
+        style={styles.search}
+      />
+
+      {/* LIST */}
+      <FlatList
+        data={filteredData}
+        keyExtractor={(i) => i.MaMonHoc.toString()}
+        ListEmptyComponent={
+          <Text style={styles.empty}>❌ Không tìm thấy môn học</Text>
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate("NhomTheoMon", {
+                maMonHoc: item.MaMonHoc,
+              })
+            }
+            style={styles.card}
+          >
+            <Text style={styles.cardTitle}>📘 {item.TenMonHoc}</Text>
+          </TouchableOpacity>
+        )}
+      />
+    </SafeAreaView>
   );
 }
 
-// =====================
-// STYLE
-// =====================
-const styles = StyleSheet.create({
+const styles = {
   container: {
     flex: 1,
+    backgroundColor: "#f2f4f8",
+    paddingHorizontal: 15,
   },
 
   center: {
@@ -135,50 +104,46 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  card: {
-    backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 12,
+  header: {
+    marginTop: 10,
     marginBottom: 10,
-    elevation: 3,
   },
 
-  name: {
-    fontSize: 16,
+  back: {
+    color: "#2196F3",
     fontWeight: "bold",
-  },
-
-  sub: {
-    color: "#888",
-    marginTop: 5,
-  },
-
-  emptyIcon: {
-    fontSize: 50,
     marginBottom: 10,
   },
 
-  emptyTitle: {
+  title: {
     fontSize: 20,
     fontWeight: "bold",
   },
 
-  emptySub: {
-    color: "#777",
-    marginTop: 5,
-    marginBottom: 20,
-    textAlign: "center",
-  },
-
-  createBtn: {
-    backgroundColor: "#2f80ed",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+  search: {
+    backgroundColor: "#fff",
+    padding: 12,
     borderRadius: 10,
+    marginBottom: 10,
+    elevation: 2,
   },
 
-  createText: {
-    color: "#fff",
+  card: {
+    backgroundColor: "#fff",
+    padding: 15,
+    marginBottom: 10,
+    borderRadius: 12,
+    elevation: 3,
+  },
+
+  cardTitle: {
+    fontSize: 16,
     fontWeight: "bold",
   },
-});
+
+  empty: {
+    textAlign: "center",
+    marginTop: 20,
+    color: "#888",
+  },
+};

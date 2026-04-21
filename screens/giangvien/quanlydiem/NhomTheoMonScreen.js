@@ -1,50 +1,157 @@
 import React, { useEffect, useState, useContext } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  SafeAreaView,
+  StatusBar,
+} from "react-native";
+
+import { getNhomByMon } from "../../../api/quanlydiem";
 import { AuthContext } from "../../../context/AuthContext";
-import { getNhomGV } from "../../../api/quanlydiem";
 
 export default function NhomTheoMonScreen({ route, navigation }) {
-  const { maMonHoc, tenMon } = route.params;
+  const { maMonHoc } = route.params;
   const { user } = useContext(AuthContext);
 
-  const [nhom, setNhom] = useState([]);
+  const [data, setData] = useState([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    load();
-  }, []);
+    const load = async () => {
+      try {
+        const res = await getNhomByMon(maMonHoc, user.userId);
+        setData(res || []);
+      } catch (err) {
+        setData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const load = async () => {
-    const res = await getNhomGV(user.userId, maMonHoc);
-    setNhom(res.data);
-  };
+    load();
+  }, [maMonHoc]);
+
+  // ================= SEARCH =================
+  const filteredData = data.filter(item =>
+    item.TenNhom?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // ================= LOADING =================
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.center}>
+        <Text>Đang tải lớp...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>📘 {tenMon}</Text>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
 
+      {/* HEADER */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.back}>← Quay lại</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.title}>📚 Danh sách lớp</Text>
+      </View>
+
+      {/* SEARCH */}
+      <TextInput
+        placeholder="🔍 Tìm lớp học..."
+        value={search}
+        onChangeText={setSearch}
+        style={styles.search}
+      />
+
+      {/* LIST */}
       <FlatList
-        data={nhom}
-        keyExtractor={item => item.MaNhom.toString()}
+        data={filteredData}
+        keyExtractor={(i) => i.MaNhom.toString()}
+        ListEmptyComponent={
+          <Text style={styles.empty}>
+            ❌ Không tìm thấy lớp
+          </Text>
+        }
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={styles.card}
             onPress={() =>
               navigation.navigate("BangDiem", {
                 maNhom: item.MaNhom,
+                tenNhom: item.TenNhom,
               })
             }
+            style={styles.card}
           >
-            <Text style={styles.name}>{item.TenNhom}</Text>
+            <Text style={styles.cardTitle}>
+              🏫 {item.TenNhom}
+            </Text>
           </TouchableOpacity>
         )}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 15, backgroundColor: "#f4f6fb" },
-  title: { fontSize: 20, fontWeight: "bold", marginBottom: 10 },
-  card: { backgroundColor: "#fff", padding: 15, borderRadius: 12, marginBottom: 10 },
-  name: { fontWeight: "bold" }
-});
+const styles = {
+  container: {
+    flex: 1,
+    backgroundColor: "#f2f4f8",
+    paddingHorizontal: 15,
+  },
+
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  header: {
+    marginTop: 10,
+    marginBottom: 10,
+  },
+
+  back: {
+    color: "#2196F3",
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+
+  title: {
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+
+  search: {
+    backgroundColor: "#fff",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 10,
+    elevation: 2,
+  },
+
+  card: {
+    backgroundColor: "#fff",
+    padding: 15,
+    marginBottom: 10,
+    borderRadius: 12,
+    elevation: 3,
+  },
+
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  empty: {
+    textAlign: "center",
+    marginTop: 20,
+    color: "#888",
+  },
+};

@@ -103,7 +103,7 @@ export default function MainLayout({ children, title, navigation }) {
           <Text>📚 Quản lý điểm</Text>
         </TouchableOpacity>
 
-        {/* <TouchableOpacity
+        <TouchableOpacity
           style={styles.menuItem}
           onPress={() => {
             toggleMenu();
@@ -111,7 +111,7 @@ export default function MainLayout({ children, title, navigation }) {
           }}
         >
           <Text>📚 Quản lý môn học</Text>
-        </TouchableOpacity> */}
+        </TouchableOpacity>
 
 
         <TouchableOpacity style={styles.logout} onPress={logout}>

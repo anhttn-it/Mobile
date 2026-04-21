@@ -9,10 +9,12 @@ import NhomScreen from "../screens/giangvien/NhomScreen";
 import MonHocDiemScreen from "../screens/giangvien/quanlydiem/MonHocDiemScreen";
 import NhomTheoMonScreen from "../screens/giangvien/quanlydiem/NhomTheoMonScreen";
 import BangDiemScreen from "../screens/giangvien/quanlydiem/BangDiemScreen";
+import ChartDiemScreen from "../screens/giangvien/quanlydiem/ChartDiemScreen";
+import ChiTietBaiLamScreen from "../screens/giangvien/quanlydiem/ChiTietBaiLamScreen";
 
 import CauHoiScreen from "../screens/giangvien/CauHoiScreen";
 import EditCauHoiScreen from "../screens/giangvien/EditCauHoiScreen";
-// import MonHocScreen from "../screens/giangvien/MonHocScreen";
+import MonHocScreen from "../screens/giangvien/MonHocScreen";
 import DeThiScreen from "../screens/giangvien/DeThiScreen";
 import DeThiDetailScreen from "../screens/giangvien/DeThiDetailScreen";
 import CreateDeThiScreen from "../screens/giangvien/CreateDeThiScreen";
@@ -32,9 +34,11 @@ export default function GVNavigator() {
       <Stack.Screen name="Diem" component={MonHocDiemScreen} />
       <Stack.Screen name="NhomTheoMon" component={NhomTheoMonScreen} />
       <Stack.Screen name="BangDiem" component={BangDiemScreen} />
+      <Stack.Screen name="ChartDiem" component={ChartDiemScreen} />
+      <Stack.Screen name="ChiTietBaiLam" component={ChiTietBaiLamScreen} />
       <Stack.Screen name="CauHoi" component={CauHoiScreen} />
       <Stack.Screen name="EditCauHoi" component={EditCauHoiScreen} />
-      {/* <Stack.Screen name="monhoc" component={MonHocScreen} /> */}
+      <Stack.Screen name="monhoc" component={MonHocScreen} />
       <Stack.Screen name="DeThiDetailScreen" component={DeThiDetailScreen} />
       <Stack.Screen name="CreateDeThiScreen" component={CreateDeThiScreen} />
       <Stack.Screen name="EditDeThiScreen" component={EditDeThiScreen} />
