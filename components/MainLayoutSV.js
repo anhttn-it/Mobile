@@ -67,7 +67,7 @@ export default function MainLayout({ children, title, navigation }) {
           style={styles.menuItem}
           onPress={() => {
             toggleMenu();
-            navigation.navigate("baithi");
+            navigation.navigate("LamBaiListScreen");
           }}
         >
           <Text>📖 Làm bài thi</Text>

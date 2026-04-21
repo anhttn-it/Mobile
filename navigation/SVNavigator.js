@@ -4,6 +4,8 @@ import { createStackNavigator } from "@react-navigation/stack";
 import HomeSV from "../screens/sinhvien/HomeSV";
 import MyGroupsScreen from "../screens/sinhvien/MyGroupsScreen.js";
 import JoinGroupScreen from "../screens/sinhvien/JoinGroupScreen.js";
+import LamBaiScreen from "../screens/sinhvien/LamBaiScreen.js";
+import LamBaiListScreen from "../screens/sinhvien/LamBaiListScreen.js";
 
 const Stack = createStackNavigator();
 
@@ -13,6 +15,8 @@ export default function SVNavigator() {
       <Stack.Screen name="HomeSV" component={HomeSV} />
       <Stack.Screen name="MyGroups" component={require("../screens/sinhvien/MyGroupsScreen.js").default} />
       <Stack.Screen name="JoinGroupScreen" component={require("../screens/sinhvien/JoinGroupScreen.js").default} />
+      <Stack.Screen name="LamBaiScreen" component={require("../screens/sinhvien/LamBaiScreen.js").default} />
+      <Stack.Screen name="LamBaiListScreen" component={require("../screens/sinhvien/LamBaiListScreen.js").default} />
       {/* sau này thêm:
       <Stack.Screen name="ExamList" component={ExamList} />
       <Stack.Screen name="Result" component={ResultScreen} />
