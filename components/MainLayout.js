@@ -70,7 +70,7 @@ export default function MainLayout({ children, title, navigation }) {
             navigation.navigate("DeThi");
           }}
         >
-          <Text>📚 Đề thi</Text>
+          <Text>📘 Đề thi</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -90,7 +90,7 @@ export default function MainLayout({ children, title, navigation }) {
             navigation.navigate("Nhom");
           }}
         >
-          <Text>📚 Quản lý lớp học</Text>
+          <Text>👥 Quản lý lớp học</Text>
         </TouchableOpacity>
          
          <TouchableOpacity
@@ -100,7 +100,7 @@ export default function MainLayout({ children, title, navigation }) {
             navigation.navigate("Diem");
           }}
         >
-          <Text>📚 Quản lý điểm</Text>
+          <Text>📊 Quản lý điểm</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

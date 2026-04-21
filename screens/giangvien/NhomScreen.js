@@ -11,7 +11,7 @@ import {
   Modal,
   RefreshControl,
 } from "react-native";
-
+import { Picker } from "@react-native-picker/picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import MainLayout from "../../components/MainLayout";
@@ -307,6 +307,61 @@ export default function NhomScreen({ navigation }) {
             </View>
           </Modal>
 
+       {/* ================= CREATE GROUP MODAL ================= */}
+<Modal visible={modalVisible} transparent animationType="fade">
+  <View style={styles.modalOverlay}>
+    <View style={styles.createCard}>
+
+      <Text style={styles.modalTitle}>➕ Tạo nhóm mới</Text>
+
+      {/* TÊN NHÓM */}
+      <TextInput
+        placeholder="Tên nhóm"
+        value={tenNhom}
+        onChangeText={setTenNhom}
+        style={styles.input}
+      />
+
+      {/* DROPDOWN MÔN HỌC */}
+      <View style={styles.dropdownBox}>
+        <Picker
+          selectedValue={maMonHoc}
+          onValueChange={(value) => setMaMonHoc(value)}
+        >
+          <Picker.Item label="-- Chọn môn học --" value={null} />
+
+          {monHocList.map((mh) => (
+            <Picker.Item
+              key={mh.MaMonHoc}
+              label={mh.TenMonHoc}
+              value={mh.MaMonHoc}
+            />
+          ))}
+        </Picker>
+      </View>
+
+      {/* BUTTON CREATE */}
+      <TouchableOpacity
+        style={styles.createBtn}
+        onPress={handleCreate}
+      >
+        <Text style={{ color: "#fff", fontWeight: "600" }}>
+          Tạo nhóm
+        </Text>
+      </TouchableOpacity>
+
+      {/* BUTTON CLOSE */}
+      <TouchableOpacity
+        style={styles.closeBtn}
+        onPress={() => setModalVisible(false)}
+      >
+        <Text style={{ fontWeight: "600" }}>Đóng</Text>
+      </TouchableOpacity>
+
+    </View>
+  </View>
+</Modal>
+
         </View>
       </SafeAreaView>
     </MainLayout>
@@ -432,4 +487,39 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
   },
+  modalOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.5)",
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+createCard: {
+  width: "90%",
+  backgroundColor: "#fff",
+  padding: 20,
+  borderRadius: 15,
+},
+
+createBtn: {
+  backgroundColor: "#2563eb",
+  padding: 12,
+  borderRadius: 10,
+  alignItems: "center",
+  marginTop: 10,
+},
+closeBtn: {
+  backgroundColor: "#e5e7eb",
+  padding: 12,
+  borderRadius: 10,
+  alignItems: "center",
+  marginTop: 10,
+},
+dropdownBox: {
+  borderWidth: 1,
+  borderColor: "#ddd",
+  borderRadius: 10,
+  marginBottom: 10,
+  backgroundColor: "#fff",
+},
 });
