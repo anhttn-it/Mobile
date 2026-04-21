@@ -1,2 +1,1 @@
-export const API_URL =
-  "https://glare-legwork-snooper.ngrok-free.dev";
+export const API_URL = "https://wisdom-dorsal-drizzly.ngrok-free.dev";
