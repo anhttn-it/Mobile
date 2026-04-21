@@ -67,50 +67,10 @@ export default function MainLayout({ children, title, navigation }) {
           style={styles.menuItem}
           onPress={() => {
             toggleMenu();
-            navigation.navigate("DeThi");
-          }}
-        >
-          <Text>📄 Quản lý đề thi</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => {
-            toggleMenu();
             navigation.navigate("CauHoi");
           }}
         >
           <Text>❓ Quản lý câu hỏi</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => {
-            toggleMenu();
-            navigation.navigate("SinhVien");
-          }}
-        >
-          <Text>🎓 Quản lý sinh viên</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => {
-            toggleMenu();
-            navigation.navigate("Diem");
-          }}
-        >
-          <Text>📊 Quản lý điểm</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => {
-            toggleMenu();
-            navigation.navigate("MonHoc");
-          }}
-        >
-          <Text>📘 Quản lý môn học</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

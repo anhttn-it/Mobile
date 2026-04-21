@@ -10,11 +10,21 @@ import {
   ActivityIndicator,
   Modal,
   RefreshControl,
+  Platform,
 } from "react-native";
 
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import MainLayout from "../../components/MainLayout";
-import { getNhom, createNhom } from "../../api/nhom";
+import {
+  getNhom,
+  createNhom,
+  getNhomDetail,
+  deleteNhom,
+  addStudent,
+  removeStudent,
+} from "../../api/nhom";
+
 import { AuthContext } from "../../context/AuthContext";
 
 export default function NhomScreen({ navigation }) {
@@ -27,10 +37,16 @@ export default function NhomScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // modal
+  // CREATE MODAL
   const [modalVisible, setModalVisible] = useState(false);
   const [tenNhom, setTenNhom] = useState("");
   const [maMonHoc, setMaMonHoc] = useState("");
+
+  // DETAIL MODAL
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [groupDetail, setGroupDetail] = useState(null);
+  const [email, setEmail] = useState("");
 
   // =====================
   // LOAD DATA
@@ -45,7 +61,6 @@ export default function NhomScreen({ navigation }) {
       setNhom(data);
       setFiltered(data);
     } catch (err) {
-      console.log(err);
       Alert.alert("Lỗi", err.message);
     } finally {
       setLoading(false);
@@ -76,15 +91,15 @@ export default function NhomScreen({ navigation }) {
       return;
     }
 
-    const result = nhom.filter((item) =>
-      item.TenNhom?.toLowerCase().includes(text.toLowerCase())
+    setFiltered(
+      nhom.filter((item) =>
+        item.TenNhom?.toLowerCase().includes(text.toLowerCase())
+      )
     );
-
-    setFiltered(result);
   };
 
   // =====================
-  // CREATE CLASS
+  // CREATE GROUP
   // =====================
   const handleCreate = async () => {
     if (!tenNhom || !maMonHoc) {
@@ -99,10 +114,7 @@ export default function NhomScreen({ navigation }) {
         GiangVien: user.userId,
       });
 
-      Alert.alert(
-        "Thành công",
-        `Tạo lớp thành công\nMã mời: ${res.MaMoi}`
-      );
+      Alert.alert("Thành công", `Mã mời: ${res.MaMoi}`);
 
       setTenNhom("");
       setMaMonHoc("");
@@ -110,26 +122,92 @@ export default function NhomScreen({ navigation }) {
 
       loadData();
     } catch (err) {
-      console.log(err);
       Alert.alert("Lỗi", err.message);
     }
   };
 
   // =====================
-  // UI ITEM
+  // OPEN GROUP DETAIL
   // =====================
-  const renderItem = ({ item }) => (
-    <View style={styles.card}>
-      <Text style={styles.title}>{item.TenNhom}</Text>
-      <Text>📘 Môn: {item.TenMonHoc}</Text>
-      <Text>👨‍🎓 Sĩ số: {item.SiSo}</Text>
-      <Text>🔑 Mã mời: {item.MaMoi}</Text>
-    </View>
-  );
+  const openGroup = async (item) => {
+    try {
+      setSelectedGroup(item);
+      setDetailVisible(true);
+
+      const data = await getNhomDetail(item.MaNhom);
+      setGroupDetail(data);
+    } catch (err) {
+      Alert.alert("Lỗi", err.message);
+    }
+  };
 
   // =====================
-  // LOADING USER
+  // ADD STUDENT
   // =====================
+  const handleAddStudent = async () => {
+  try {
+    await addStudent(selectedGroup.MaNhom, email);
+    setEmail("");
+
+    // 🔥 1. refresh chi tiết nhóm
+    const data = await getNhomDetail(selectedGroup.MaNhom);
+    setGroupDetail(data);
+
+    // 🔥 2. refresh danh sách nhóm để cập nhật SiSo
+    await loadData();
+
+  } catch (err) {
+    Alert.alert("Lỗi", err.message);
+  }
+};
+
+  // =====================
+  // REMOVE STUDENT
+  // =====================
+const handleRemoveStudent = async (id) => {
+  try {
+    await removeStudent(selectedGroup.MaNhom, id);
+
+    const data = await getNhomDetail(selectedGroup.MaNhom);
+    setGroupDetail(data);
+
+    await loadData();
+  } catch (err) {
+    Alert.alert("Lỗi", err.message);
+  }
+};
+  // =====================
+  // DELETE GROUP
+  // =====================
+  const handleDeleteGroup = () => {
+    Alert.alert("Xác nhận", "Xóa nhóm này?", [
+      { text: "Hủy" },
+      {
+        text: "Xóa",
+        style: "destructive",
+        onPress: async () => {
+          await deleteNhom(selectedGroup.MaNhom);
+          setDetailVisible(false);
+          loadData();
+        },
+      },
+    ]);
+  };
+
+  // =====================
+  // RENDER ITEM
+  // =====================
+  const renderItem = ({ item }) => (
+    <TouchableOpacity onPress={() => openGroup(item)}>
+      <View style={styles.card}>
+        <Text style={styles.title}>{item.TenNhom}</Text>
+        <Text>📘 Môn: {item.TenMonHoc}</Text>
+        <Text>👨‍🎓 Sĩ số: {item.SiSo}</Text>
+        <Text>🔑 Mã mời: {item.MaMoi}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   if (!user) {
     return (
       <View style={styles.center}>
@@ -141,83 +219,128 @@ export default function NhomScreen({ navigation }) {
 
   return (
     <MainLayout title="📚 Lớp của tôi" navigation={navigation}>
-      <View style={styles.container}>
-        
-        {/* SEARCH + CREATE */}
-        <View style={styles.topBar}>
-          <TextInput
-            placeholder="Tìm lớp..."
-            value={search}
-            onChangeText={handleSearch}
-            style={styles.search}
-          />
+      <SafeAreaView style={{ flex: 1 }}>
+        <View style={styles.container}>
 
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => setModalVisible(true)}
-          >
-            <Text style={{ color: "#fff" }}>+ Tạo</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* LIST */}
-        {loading ? (
-          <ActivityIndicator size="large" />
-        ) : filtered.length === 0 ? (
-          <Text>Không có lớp nào</Text>
-        ) : (
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => item.MaNhom.toString()}
-            renderItem={renderItem}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-          />
-        )}
-
-        {/* MODAL */}
-        <Modal visible={modalVisible} animationType="slide">
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>➕ Tạo lớp</Text>
-
+          {/* SEARCH + CREATE */}
+          <View style={styles.topBar}>
             <TextInput
-              placeholder="Tên lớp"
-              value={tenNhom}
-              onChangeText={setTenNhom}
-              style={styles.input}
+              placeholder="Tìm lớp..."
+              value={search}
+              onChangeText={handleSearch}
+              style={styles.search}
             />
 
-            <TextInput
-              placeholder="Mã môn học"
-              value={maMonHoc}
-              onChangeText={setMaMonHoc}
-              keyboardType="numeric"
-              style={styles.input}
-            />
-
-            <TouchableOpacity style={styles.btn} onPress={handleCreate}>
-              <Text style={{ color: "#fff" }}>Tạo</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text style={styles.close}>Đóng</Text>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => setModalVisible(true)}
+            >
+              <Text style={{ color: "#fff" }}>+ Tạo</Text>
             </TouchableOpacity>
           </View>
-        </Modal>
 
-      </View>
+          {/* LIST */}
+          {loading ? (
+            <ActivityIndicator size="large" />
+          ) : (
+            <FlatList
+              data={filtered}
+              keyExtractor={(item) => item.MaNhom.toString()}
+              renderItem={renderItem}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              }
+            />
+          )}
+
+          {/* CREATE MODAL */}
+          <Modal visible={modalVisible} animationType="slide">
+            <View style={styles.modal}>
+              <Text style={styles.modalTitle}>➕ Tạo lớp</Text>
+
+              <TextInput
+                placeholder="Tên lớp"
+                value={tenNhom}
+                onChangeText={setTenNhom}
+                style={styles.input}
+              />
+
+              <TextInput
+                placeholder="Mã môn học"
+                value={maMonHoc}
+                onChangeText={setMaMonHoc}
+                keyboardType="numeric"
+                style={styles.input}
+              />
+
+              <TouchableOpacity style={styles.btn} onPress={handleCreate}>
+                <Text style={{ color: "#fff" }}>Tạo</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Text style={styles.close}>Đóng</Text>
+              </TouchableOpacity>
+            </View>
+          </Modal>
+
+          {/* DETAIL MODAL */}
+          <Modal visible={detailVisible} animationType="slide">
+            <View style={styles.modal}>
+
+              <Text style={styles.modalTitle}>
+                {selectedGroup?.TenNhom}
+              </Text>
+
+              <Text>Mã mời: {selectedGroup?.MaMoi}</Text>
+
+              <TextInput
+                placeholder="Email học viên"
+                value={email}
+                onChangeText={setEmail}
+                style={styles.input}
+              />
+
+              <TouchableOpacity style={styles.btn} onPress={handleAddStudent}>
+                <Text style={{ color: "#fff" }}>Thêm học viên</Text>
+              </TouchableOpacity>
+
+              <FlatList
+                data={groupDetail?.students || []}
+                keyExtractor={(i) => i.MaNguoiDung?.toString()}
+                renderItem={({ item }) => (
+                  <View style={styles.studentRow}>
+                    <Text>{item.Email}</Text>
+                    <TouchableOpacity onPress={() => handleRemoveStudent(item.MaNguoiDung)}>
+                      <Text style={{ color: "red" }}>Xóa</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              />
+
+              <TouchableOpacity
+                style={[styles.btn, { backgroundColor: "red", marginTop: 10 }]}
+                onPress={handleDeleteGroup}
+              >
+                <Text style={{ color: "#fff" }}>Xóa nhóm</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => setDetailVisible(false)}>
+                <Text style={styles.close}>Đóng</Text>
+              </TouchableOpacity>
+
+            </View>
+          </Modal>
+
+        </View>
+      </SafeAreaView>
     </MainLayout>
   );
 }
-
-// =====================
-// STYLE
-// =====================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 15,
+    paddingTop: 10, // 👈 tránh dính status bar
     backgroundColor: "#f2f4f8",
   },
 
@@ -260,14 +383,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: "bold",
-    marginBottom: 5,
   },
 
+  // =========================
+  // MODAL FIX SAFE TOP + BOTTOM
+  // =========================
   modal: {
     flex: 1,
-    justifyContent: "center",
-    padding: 20,
-    backgroundColor: "#f9f9f9",
+    justifyContent: "center", // 👈 cách trên + dưới đều nhau
+    paddingHorizontal: 20,
+
+    paddingTop: Platform.OS === "ios" ? 60 : 20,   // 👈 tránh tai thỏ
+    paddingBottom: Platform.OS === "ios" ? 40 : 20, // 👈 tránh home indicator
+
+    backgroundColor: "#fff",
   },
 
   modalTitle: {
@@ -280,9 +409,9 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
-    borderRadius: 8,
     padding: 10,
     marginBottom: 10,
+    borderRadius: 8,
     backgroundColor: "#fff",
   },
 
@@ -294,8 +423,14 @@ const styles = StyleSheet.create({
   },
 
   close: {
-    marginTop: 15,
+    marginTop: 10,
     color: "red",
     textAlign: "center",
+  },
+
+  studentRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 10,
   },
 });

@@ -89,16 +89,25 @@ export const joinNhom = async (maMoi, maNguoiDung) => {
 };
 
 // =====================
-// 4. CHI TIẾT NHÓM
+// 4. CHI TIẾT NHÓM (ĐÃ CHUẨN HÓA)
 // =====================
 export const getNhomDetail = async (id) => {
   if (!id) throw new Error("Thiếu id nhóm");
 
-  return safeFetch(`${BASE_URL}/${id}`, {
+  const data = await safeFetch(`${BASE_URL}/${id}`, {
     method: "GET",
   });
-};
 
+  return {
+    MaNhom: data.MaNhom,
+    TenNhom: data.TenNhom,
+    MaMoi: data.MaMoi,
+    SiSo: data.SiSo,
+
+    // 🔥 chuẩn hóa sinh viên
+    students: data.SinhVien || [],
+  };
+};
 // =====================
 // 5. XÓA NHÓM
 // =====================
@@ -106,7 +115,7 @@ export const deleteNhom = async (id) => {
   if (!id) throw new Error("Thiếu id");
 
   return safeFetch(`${BASE_URL}/${id}`, {
-    method: "DELETE",
+    method: "POST",
   });
 };
 
@@ -137,7 +146,14 @@ export const removeStudent = async (maNhom, maNguoiDung) => {
   return safeFetch(
     `${BASE_URL}/remove-student?maNhom=${maNhom}&maNguoiDung=${maNguoiDung}`,
     {
-      method: "DELETE",
+      method: "POST",
     }
   );
 };
+
+
+export const refreshNhomDetail = async (maNhom) => {
+  return getNhomDetail(maNhom);
+};
+
+

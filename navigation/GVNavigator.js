@@ -10,6 +10,8 @@ import MonHocDiemScreen from "../screens/giangvien/quanlydiem/MonHocDiemScreen";
 import NhomTheoMonScreen from "../screens/giangvien/quanlydiem/NhomTheoMonScreen";
 import BangDiemScreen from "../screens/giangvien/quanlydiem/BangDiemScreen";
 
+import CauHoiScreen from "../screens/giangvien/CauHoiScreen";
+import EditCauHoiScreen from "../screens/giangvien/EditCauHoiScreen";
 const Stack = createStackNavigator();
 
 export default function GVNavigator() {
@@ -24,6 +26,8 @@ export default function GVNavigator() {
       <Stack.Screen name="Diem" component={MonHocDiemScreen} />
       <Stack.Screen name="NhomTheoMon" component={NhomTheoMonScreen} />
       <Stack.Screen name="BangDiem" component={BangDiemScreen} />
+      <Stack.Screen name="CauHoi" component={CauHoiScreen} />
+      <Stack.Screen name="EditCauHoi" component={EditCauHoiScreen} />
     </Stack.Navigator>
   );
 }
