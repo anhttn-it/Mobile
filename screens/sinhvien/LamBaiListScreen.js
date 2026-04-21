@@ -6,115 +6,126 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
-  StatusBar,
+  ActivityIndicator,
 } from "react-native";
 
-import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthContext } from "../../context/AuthContext";
 import { getDeThi } from "../../api/lambai";
+import MainLayoutSV from "../../components/MainLayoutSV";
 
 export default function LamBaiListScreen({ navigation }) {
   const { user } = useContext(AuthContext);
 
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     load();
   }, []);
 
   const load = async () => {
-    const res = await getDeThi(user.userId);
-    setData(res || []);
+    try {
+      setLoading(true);
+      const res = await getDeThi(user?.userId);
+      setData(Array.isArray(res) ? res : []);
+    } catch (err) {
+      console.log("LOAD DE THI ERROR:", err.message);
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const filtered = data.filter(x =>
-    x.TenDe?.toLowerCase().includes(search.toLowerCase())
+  const filtered = data.filter((x) =>
+    x?.TenDe?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <MainLayoutSV navigation={navigation} title="📚 Danh sách đề thi">
 
-      {/* HEADER */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>📚 Danh sách đề thi</Text>
+      <View style={styles.container}>
+
+        {/* SEARCH */}
+        <TextInput
+          placeholder="🔍 Tìm kiếm đề thi..."
+          value={search}
+          onChangeText={setSearch}
+          style={styles.search}
+        />
+
+        {/* LOADING */}
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#3498db" />
+            <Text>Đang tải dữ liệu...</Text>
+          </View>
+        ) : filtered.length === 0 ? (
+          <View style={styles.center}>
+            <Text>Không có đề thi nào</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={(i) => i.MaDe.toString()}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate("LamBaiScreen", { id: item.MaDe })
+                }
+                style={styles.card}
+              >
+                <Text style={styles.title}>📘 {item.TenDe}</Text>
+
+                <Text style={styles.sub}>
+                  📝 Dễ: {item.SoCauDe ?? 0} | TB:{" "}
+                  {item.SoCauTrungBinh ?? 0} | Khó:{" "}
+                  {item.SoCauKho ?? 0}
+                </Text>
+
+                <View style={styles.btn}>
+                  <Text style={styles.btnText}>Làm bài →</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        )}
       </View>
 
-      {/* SEARCH */}
-      <TextInput
-        placeholder="🔍 Tìm kiếm đề thi..."
-        value={search}
-        onChangeText={setSearch}
-        style={styles.search}
-      />
-
-      {/* LIST */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(i) => i.MaDe.toString()}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() =>
-              navigation.navigate("LamBaiScreen", { id: item.MaDe })
-            }
-            style={styles.card}
-          >
-            <Text style={styles.title}>📘 {item.TenDe}</Text>
-
-            <Text style={styles.sub}>
-              📝 Dễ: {item.SoCauDe} | TB: {item.SoCauTrungBinh} | Khó:{" "}
-              {item.SoCauKho}
-            </Text>
-
-            <View style={styles.btn}>
-              <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                Làm bài →
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-      />
-    </SafeAreaView>
+    </MainLayoutSV>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 15,
     backgroundColor: "#f4f6f9",
-    paddingHorizontal: 15,
-  },
-
-  // HEADER
-  header: {
-    paddingTop: 10,
-    paddingBottom: 10,
-    alignItems: "center",
   },
 
   headerTitle: {
     fontSize: 18,
     fontWeight: "bold",
+    marginBottom: 10,
     color: "#2c3e50",
   },
 
-  // SEARCH
   search: {
     backgroundColor: "#fff",
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: "#e0e0e0",
-    marginBottom: 10,
   },
 
-  // CARD
   card: {
     backgroundColor: "#fff",
     padding: 15,
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 12,
     elevation: 2,
   },
@@ -122,7 +133,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: "bold",
-    marginBottom: 6,
+    marginBottom: 5,
     color: "#2c3e50",
   },
 
@@ -132,11 +143,21 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  // BUTTON
   btn: {
     backgroundColor: "#3498db",
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: "center",
+  },
+
+  btnText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+
+  center: {
+    marginTop: 30,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
