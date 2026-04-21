@@ -87,7 +87,7 @@ export default function MainLayout({ children, title, navigation }) {
           style={styles.menuItem}
           onPress={() => {
             toggleMenu();
-            navigation.navigate("nhomhoctap");
+            navigation.navigate("MyGroups");
           }}
         >
           <Text>📚 Nhóm học tập</Text>
