@@ -6,6 +6,7 @@ import HomeGV from "../screens/giangvien/HomeGV";
 // import ClassScreen from "../screens/giangvien/ClassScreen";
 // import ExamScreen from "../screens/giangvien/ExamScreen";
 import NhomScreen from "../screens/giangvien/NhomScreen";
+import CauHoiScreen from "../screens/giangvien/CauHoiScreen";
 
 const Stack = createStackNavigator();
 
@@ -18,6 +19,7 @@ export default function GVNavigator() {
       {/* <Stack.Screen name="Class" component={ClassScreen} /> */}
       {/* <Stack.Screen name="Exam" component={ExamScreen} /> */}
       <Stack.Screen name="Nhom" component={NhomScreen} />
+      <Stack.Screen name="CauHoi" component={CauHoiScreen} />
     </Stack.Navigator>
   );
 }
