@@ -90,7 +90,7 @@ export default function MainLayout({ children, title, navigation }) {
             navigation.navigate("MyGroups");
           }}
         >
-          <Text>📚 Nhóm học tập</Text>
+          <Text>📚 Lớp học</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.logout} onPress={logout}>

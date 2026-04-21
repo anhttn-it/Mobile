@@ -80,9 +80,7 @@ export default function LamBaiListScreen({ navigation }) {
                 <Text style={styles.title}>📘 {item.TenDe}</Text>
 
                 <Text style={styles.sub}>
-                  📝 Dễ: {item.SoCauDe ?? 0} | TB:{" "}
-                  {item.SoCauTrungBinh ?? 0} | Khó:{" "}
-                  {item.SoCauKho ?? 0}
+                  👥 Lớp: {item.TenNhom || "Không có lớp"}
                 </Text>
 
                 <View style={styles.btn}>
