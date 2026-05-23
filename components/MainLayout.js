@@ -112,8 +112,25 @@ export default function MainLayout({ children, title, navigation }) {
         >
           <Text>📚 Quản lý môn học</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => {
+            toggleMenu();
+            navigation.navigate("SinhVien");
+          }}
+        >
+          <Text>👨‍🎓 Quản lý sinh viên</Text>
+        </TouchableOpacity>
 
-
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => {
+            toggleMenu();
+            navigation.navigate("ThongBaoGV");
+          }}
+        >
+          <Text>📢 Thông báo</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.logout} onPress={logout}>
           <Text style={{ color: "white", fontWeight: "bold" }}>
             🚪 Đăng xuất

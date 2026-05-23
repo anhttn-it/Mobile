@@ -6,6 +6,8 @@ import HomeGV from "../screens/giangvien/HomeGV";
 // import ClassScreen from "../screens/giangvien/ClassScreen";
 // import ExamScreen from "../screens/giangvien/ExamScreen";
 import NhomScreen from "../screens/giangvien/NhomScreen";
+import SinhVienScreen from "../screens/giangvien/SinhVienScreen";
+import ThongBaoGVScreen from "../screens/giangvien/ThongBaoGVScreen";
 import MonHocDiemScreen from "../screens/giangvien/quanlydiem/MonHocDiemScreen";
 import NhomTheoMonScreen from "../screens/giangvien/quanlydiem/NhomTheoMonScreen";
 import BangDiemScreen from "../screens/giangvien/quanlydiem/BangDiemScreen";
@@ -31,6 +33,8 @@ export default function GVNavigator() {
       {/* <Stack.Screen name="Exam" component={ExamScreen} /> */}
       <Stack.Screen name="DeThi" component={DeThiScreen} />
       <Stack.Screen name="Nhom" component={NhomScreen} />
+      <Stack.Screen name="SinhVien" component={SinhVienScreen} />
+      <Stack.Screen name="ThongBaoGV" component={ThongBaoGVScreen} />
       <Stack.Screen name="Diem" component={MonHocDiemScreen} />
       <Stack.Screen name="NhomTheoMon" component={NhomTheoMonScreen} />
       <Stack.Screen name="BangDiem" component={BangDiemScreen} />

@@ -8,6 +8,8 @@ import LamBaiScreen from "../screens/sinhvien/LamBaiScreen.js";
 import LamBaiListScreen from "../screens/sinhvien/LamBaiListScreen.js";
 import LichSuScreen from "../screens/sinhvien/LichSuScreen.js";
 import LichSuDetailScreen from "../screens/sinhvien/LichSuDetailScreen.js";
+import ThongBaoSVScreen from "../screens/sinhvien/ThongBaoSVScreen";
+
 
 const Stack = createStackNavigator();
 
@@ -16,6 +18,7 @@ export default function SVNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeSV" component={HomeSV} />
       <Stack.Screen name="MyGroups" component={require("../screens/sinhvien/MyGroupsScreen.js").default} />
+      <Stack.Screen name="ThongBaoSV" component={require("../screens/sinhvien/ThongBaoSVScreen.js").default} />
       <Stack.Screen name="JoinGroupScreen" component={require("../screens/sinhvien/JoinGroupScreen.js").default} />
       <Stack.Screen name="LamBaiScreen" component={require("../screens/sinhvien/LamBaiScreen.js").default} />
       <Stack.Screen name="LamBaiListScreen" component={require("../screens/sinhvien/LamBaiListScreen.js").default} />
