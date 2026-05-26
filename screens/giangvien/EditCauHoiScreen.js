@@ -26,30 +26,38 @@ export default function EditCauHoi({ route, navigation }) {
   const [dapAnDung, setDapAnDung] = useState(0);
 
   // ================= LOAD DETAIL =================
-  const loadDetail = async () => {
-    try {
-      const res = await getCauHoiDetail(id, user.userId);
+ const loadDetail = async () => {
+  try {
+    const res = await getCauHoiDetail(id, user.userId);
 
-      setNoiDung(res.NoiDung);
-      setDoKho(res.DoKho.toString());
-      setMaMonHoc(res.MaMonHoc);
+    console.log("🔥 DETAIL RAW:", res);
 
-      // giả sử API trả về answers
-      // ✅ ĐÚNG THEO API CỦA BẠN
-      if (res.dapAn) {
-        setDapAn(res.dapAn);
-      }
+    setNoiDung(res.NoiDung);
+    setDoKho(res.DoKho.toString());
+    setMaMonHoc(res.MaMonHoc);
 
-      if (res.dapAnDung !== undefined) {
-        setDapAnDung(res.dapAnDung);
-      }
+    // ✅ FIX Ở ĐÂY: dùng DapAns (đúng API)
+    if (res.DapAns && Array.isArray(res.DapAns)) {
+      const answers = res.DapAns.map(x => x.NoiDungTraLoi);
+      setDapAn(answers);
 
-    } catch (err) {
-      Alert.alert("Lỗi", err.message);
-    } finally {
-      setLoading(false);
+      const correctIndex = res.DapAns.findIndex(x => x.LaDapAn === true);
+      setDapAnDung(correctIndex >= 0 ? correctIndex : 0);
+
+      console.log("🔥 ANSWERS LIST:", answers);
+    } else {
+      console.log("❌ Không có DapAns");
+      setDapAn(["", "", "", ""]);
+      setDapAnDung(0);
     }
-  };
+
+  } catch (err) {
+    console.log("❌ LOAD DETAIL ERROR:", err);
+    Alert.alert("Lỗi", err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     loadDetail();
