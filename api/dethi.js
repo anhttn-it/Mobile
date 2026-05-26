@@ -20,6 +20,7 @@ const safeFetch = async (url, options = {}) => {
     const text = await res.text();
 
     let data;
+
     try {
       data = text ? JSON.parse(text) : null;
     } catch (e) {
@@ -29,13 +30,22 @@ const safeFetch = async (url, options = {}) => {
 
     if (!res.ok) {
       console.log("❌ API ERROR:", data);
-      throw new Error(data?.Message || data || "Request thất bại");
+
+      throw new Error(
+        data?.Message ||
+          data?.message ||
+          data ||
+          "Request thất bại"
+      );
     }
 
     return data;
   } catch (err) {
     console.log("❌ NETWORK ERROR:", err.message);
-    throw new Error(err.message || "Không thể kết nối server");
+
+    throw new Error(
+      err.message || "Không thể kết nối server"
+    );
   }
 };
 
@@ -43,30 +53,101 @@ const safeFetch = async (url, options = {}) => {
 // 1. DANH SÁCH ĐỀ THI
 // =====================
 export const getDeThiList = async (userId) => {
-  return safeFetch(`${BASE_URL}/list?userId=${userId}`, {
-    method: "GET",
-  });
+  if (!userId) {
+    throw new Error("Thiếu userId");
+  }
+
+  return safeFetch(
+    `${BASE_URL}/list?userId=${userId}`,
+    {
+      method: "GET",
+    }
+  );
 };
 
 // =====================
 // 2. CHI TIẾT ĐỀ THI
 // =====================
-export const getDeThiDetail = async (id, userId) => {
-  return safeFetch(`${BASE_URL}/detail/${id}?userId=${userId}`, {
-    method: "GET",
-  });
+export const getDeThiDetail = async (
+  id,
+  userId
+) => {
+  if (!id) {
+    throw new Error("Thiếu mã đề");
+  }
+
+  if (!userId) {
+    throw new Error("Thiếu userId");
+  }
+
+  return safeFetch(
+    `${BASE_URL}/detail/${id}?userId=${userId}`,
+    {
+      method: "GET",
+    }
+  );
 };
 
 // =====================
-// 3. TẠO ĐỀ THI (KHỚP DTO BACKEND)
+// 3. TẠO ĐỀ THI
 // =====================
-export const createDeThi = async (payload) => {
-  if (!payload.TenDe) throw new Error("Thiếu tên đề");
-  if (!payload.MaMonHoc) throw new Error("Thiếu môn học");
-  if (!payload.userId) throw new Error("Thiếu userId");
+export const createDeThi = async (
+  payload
+) => {
+  if (!payload.TenDe) {
+    throw new Error("Thiếu tên đề");
+  }
 
-  if (payload.kieu === "manual" && (!payload.selectedCauHoi || payload.selectedCauHoi.length === 0)) {
+  if (!payload.MaMonHoc) {
+    throw new Error("Thiếu môn học");
+  }
+
+  if (!payload.UserId) {
+    throw new Error("Thiếu userId");
+  }
+
+  if (!payload.Kieu) {
+    throw new Error("Thiếu kiểu tạo đề");
+  }
+
+  // ===== MANUAL =====
+  if (
+    payload.Kieu === "manual" &&
+    (!payload.SelectedCauHoi ||
+      payload.SelectedCauHoi.length === 0)
+  ) {
     throw new Error("Chưa chọn câu hỏi");
+  }
+
+  // ===== AUTO =====
+  if (payload.Kieu === "auto") {
+    if (
+      payload.SoCauDe < 0 ||
+      payload.SoCauTrungBinh < 0 ||
+      payload.SoCauKho < 0
+    ) {
+      throw new Error(
+        "Số lượng câu hỏi không hợp lệ"
+      );
+    }
+  }
+
+  if (!payload.ThoiGianBatDau) {
+    throw new Error(
+      "Thiếu thời gian bắt đầu"
+    );
+  }
+
+  if (!payload.ThoiGianKetThuc) {
+    throw new Error(
+      "Thiếu thời gian kết thúc"
+    );
+  }
+
+  if (!payload.ThoiGianThi) {
+    throw new Error(
+      "Thiếu thời gian thi"
+    );
   }
 
   return safeFetch(`${BASE_URL}/create`, {
@@ -74,57 +155,106 @@ export const createDeThi = async (payload) => {
     body: JSON.stringify(payload),
   });
 };
+
 // =====================
-// 4. XÓA ĐỀ THI
+// 4. UPDATE ĐỀ THI
 // =====================
-export const deleteDeThi = async (id, userId) => {
-  return safeFetch(`${BASE_URL}/delete/${id}?userId=${userId}`, {
+export const updateDeThi = async (
+  payload
+) => {
+  if (!payload.MaDe) {
+    throw new Error("Thiếu mã đề");
+  }
+
+  return safeFetch(`${BASE_URL}/update`, {
     method: "POST",
+    body: JSON.stringify(payload),
   });
 };
 
 // =====================
-// 5. NỘP BÀI
+// 5. XÓA ĐỀ THI
 // =====================
-export const nopBai = async (payload) => {
-  return safeFetch(`${BASE_URL}/nopbai`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+export const deleteDeThi = async (
+  id,
+  userId
+) => {
+  if (!id) {
+    throw new Error("Thiếu mã đề");
+  }
+
+  if (!userId) {
+    throw new Error("Thiếu userId");
+  }
+
+  return safeFetch(
+    `${BASE_URL}/delete/${id}?userId=${userId}`,
+    {
+      method: "POST",
+    }
+  );
 };
 
 // =====================
 // 6. LẤY MÔN HỌC
 // =====================
-export const getMonHocByUser = async (userId) => {
-  return safeFetch(`${BASE_URL}/monhoc?userId=${userId}`, {
-    method: "GET",
-  });
+export const getMonHocByUser = async (
+  userId
+) => {
+  if (!userId) {
+    throw new Error("Thiếu userId");
+  }
+
+  return safeFetch(
+    `${BASE_URL}/monhoc?userId=${userId}`,
+    {
+      method: "GET",
+    }
+  );
 };
 
 // =====================
 // 7. LẤY NHÓM THEO MÔN
 // =====================
-export const getNhomByMon = async (maMon, userId) => {
+export const getNhomByMon = async (
+  maMon,
+  userId
+) => {
+  if (!maMon) {
+    throw new Error("Thiếu mã môn");
+  }
+
+  if (!userId) {
+    throw new Error("Thiếu userId");
+  }
+
   return safeFetch(
     `${BASE_URL}/nhom?maMon=${maMon}&userId=${userId}`,
-    { method: "GET" }
+    {
+      method: "GET",
+    }
   );
 };
 
 // =====================
-// 8. LẤY CÂU HỎI THEO MÔN (MANUAL)
+// 8. LẤY CÂU HỎI THEO MÔN
 // =====================
-export const getCauHoiByMon = async (maMon, userId) => {
+export const getCauHoiByMon = async (
+  maMon,
+  userId
+) => {
+  if (!maMon) {
+    throw new Error("Thiếu mã môn");
+  }
+
+  if (!userId) {
+    throw new Error("Thiếu userId");
+  }
+
   return safeFetch(
     `${BASE_URL}/cauhoi?maMon=${maMon}&userId=${userId}`,
-    { method: "GET" }
+    {
+      method: "GET",
+    }
   );
-};
-
-export const updateDeThi = async (payload) => {
-  return safeFetch(`${BASE_URL}/update`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
 };

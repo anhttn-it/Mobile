@@ -1,4 +1,9 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, {
+  useEffect,
+  useState,
+  useContext,
+} from "react";
+
 import {
   View,
   Text,
@@ -11,187 +16,413 @@ import {
 } from "react-native";
 
 import MainLayout from "../../components/MainLayout";
+
 import { AuthContext } from "../../context/AuthContext";
-import { getDeThiList, deleteDeThi } from "../../api/dethi";
 
+import {
+  getDeThiList,
+  deleteDeThi,
+} from "../../api/dethi";
 
-export default function DeThiScreen({ navigation }) {
- const { user } = useContext(AuthContext);
-const [search, setSearch] = useState("");
-const [data, setData] = useState([]);
-const [loading, setLoading] = useState(false);
+export default function DeThiScreen({
+  navigation,
+}) {
+  const { user } =
+    useContext(AuthContext);
 
-// ================= LOAD DATA =================
-const loadData = async () => {
-  try {
-    if (!user?.userId) return;
+  const [search, setSearch] =
+    useState("");
 
-    setLoading(true);
+  const [data, setData] =
+    useState([]);
 
-    const res = await getDeThiList(user.userId);
-    setData(res);
+  const [loading, setLoading] =
+    useState(false);
 
-  } catch (err) {
-    Alert.alert("Lỗi", err.message);
-  } finally {
-    setLoading(false);
-  }
-};
+  // ================= LOAD DATA =================
+  const loadData = async () => {
+    try {
+      if (!user?.userId) return;
 
-// ================= LOAD LẦN ĐẦU =================
-useEffect(() => {
-  if (user?.userId) {
-    loadData();
-  }
-}, [user?.userId]);
+      setLoading(true);
 
-// ================= RELOAD KHI QUAY LẠI MÀN =================
-useEffect(() => {
-  const unsubscribe = navigation.addListener("focus", () => {
-    loadData();
-  });
+      const res =
+        await getDeThiList(
+          user.userId
+        );
 
-  return unsubscribe;
-}, [navigation]);
+      // API mới
+      setData(res || []);
+    } catch (err) {
+      Alert.alert(
+        "Lỗi",
+        err.message
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-const filteredData = data.filter(item =>
-  item.TenDe?.toLowerCase().includes(search.toLowerCase())
-);
+  // ================= FIRST LOAD =================
+  useEffect(() => {
+    if (user?.userId) {
+      loadData();
+    }
+  }, [user?.userId]);
 
- const handleDelete = (id) => {
-  Alert.alert("Xác nhận", "Xóa đề này?", [
-    { text: "Hủy" },
-    {
-      text: "Xóa",
-      onPress: async () => {
-        try {
-          await deleteDeThi(id, user.userId); // 🔥 FIX Ở ĐÂY
+  // ================= RELOAD =================
+  useEffect(() => {
+    const unsubscribe =
+      navigation.addListener(
+        "focus",
+        () => {
           loadData();
-        } catch (err) {
-          Alert.alert("Lỗi", err.message);
         }
-      },
-    },
-  ]);
-};
+      );
 
-  const renderItem = ({ item }) => (
-    <View style={styles.card}>
-      <Text style={styles.title}>{item.TenDe}</Text>
-      <Text>Số câu: {item.SoCauDe + item.SoCauTrungBinh + item.SoCauKho}</Text>
+    return unsubscribe;
+  }, [navigation]);
 
-    <Text style={{ marginTop: 4, color: "#555" }}>
-    Nhóm: {item.TenNhom ? item.TenNhom : "Không thuộc nhóm"}
-    </Text>
+  // ================= FILTER =================
+  const filteredData =
+    data.filter((item) =>
+      item.TenDe?.toLowerCase().includes(
+        search.toLowerCase()
+      )
+    );
 
-      <View style={styles.row}>
+  // ================= DELETE =================
+  const handleDelete = (id) => {
+    Alert.alert(
+      "Xác nhận",
+      "Bạn có chắc muốn xóa đề này?",
+      [
+        {
+          text: "Hủy",
+          style: "cancel",
+        },
+        {
+          text: "Xóa",
+          style: "destructive",
+
+          onPress: async () => {
+            try {
+              await deleteDeThi(
+                id,
+                user.userId
+              );
+
+              Alert.alert(
+                "Thành công",
+                "Đã xóa đề thi"
+              );
+
+              loadData();
+            } catch (err) {
+              Alert.alert(
+                "Lỗi",
+                err.message
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // ================= RENDER ITEM =================
+  const renderItem = ({
+    item,
+  }) => {
+    const tongCau =
+      (item.SoCauDe || 0) +
+      (item.SoCauTrungBinh || 0) +
+      (item.SoCauKho || 0);
+
+    return (
+      <View style={styles.card}>
+        {/* TITLE */}
+        <Text style={styles.title}>
+          📘 {item.TenDe}
+        </Text>
+
+        {/* INFO */}
+        <Text style={styles.info}>
+          Tổng số câu: {tongCau}
+        </Text>
+
+        <Text style={styles.info}>
+          Dễ: {item.SoCauDe || 0}
+        </Text>
+
+        <Text style={styles.info}>
+          Trung bình:{" "}
+          {item.SoCauTrungBinh ||
+            0}
+        </Text>
+
+        <Text style={styles.info}>
+          Khó: {item.SoCauKho || 0}
+        </Text>
+
+        <Text style={styles.info}>
+          Nhóm:
+          {" "}
+          {item.TenNhom ||
+            "Không thuộc nhóm"}
+        </Text>
+
+        {/* ACTION */}
+        <View style={styles.row}>
+          {/* DETAIL */}
+          <TouchableOpacity
+            style={styles.detailBtn}
+            onPress={() =>
+              navigation.navigate(
+                "DeThiDetailScreen",
+                {
+                  id: item.MaDe,
+                }
+              )
+            }
+          >
+            <Text style={styles.btnText}>
+              Chi tiết
+            </Text>
+          </TouchableOpacity>
+
+          {/* EDIT */}
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() =>
+              navigation.navigate(
+                "EditDeThiScreen",
+                {
+                  id: item.MaDe,
+                }
+              )
+            }
+          >
+            <Text style={styles.btnText}>
+              Sửa
+            </Text>
+          </TouchableOpacity>
+
+          {/* DELETE */}
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={() =>
+              handleDelete(
+                item.MaDe
+              )
+            }
+          >
+            <Text style={styles.btnText}>
+              Xóa
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  // ================= LOADING =================
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" />
+
+        <Text
+          style={{
+            marginTop: 10,
+          }}
+        >
+          Đang tải dữ liệu...
+        </Text>
+      </View>
+    );
+  }
+
+  // ================= UI =================
+  return (
+    <MainLayout
+      title="📘 Đề thi"
+      navigation={navigation}
+    >
+      {/* SEARCH + BUTTON */}
+      <View style={styles.topBar}>
+        <TextInput
+          placeholder="🔍 Tìm kiếm đề thi..."
+          value={search}
+          onChangeText={setSearch}
+          style={styles.search}
+        />
+
         <TouchableOpacity
-          style={styles.btn}
+          style={styles.addBtn}
           onPress={() =>
-            navigation.navigate("DeThiDetailScreen", { id: item.MaDe })
+            navigation.navigate(
+              "CreateDeThiScreen"
+            )
           }
         >
-          <Text style={{ color: "#fff" }}>Chi tiết</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-        style={styles.btn}
-        onPress={() =>
-            navigation.navigate("EditDeThiScreen", { id: item.MaDe })
-        }
-        >
-        <Text style={{ color: "#fff" }}>Sửa</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.delete}
-          onPress={() => handleDelete(item.MaDe)}
-        >
-          <Text style={{ color: "#fff" }}>Xóa</Text>
+          <Text
+            style={
+              styles.addBtnText
+            }
+          >
+            + Tạo
+          </Text>
         </TouchableOpacity>
       </View>
-    </View>
-  );
 
-  if (loading) return <ActivityIndicator size="large" />;
+      {/* EMPTY */}
+      {filteredData.length ===
+        0 && (
+        <View
+          style={styles.empty}
+        >
+          <Text
+            style={
+              styles.emptyText
+            }
+          >
+            Không có đề thi
+          </Text>
+        </View>
+      )}
 
- return (
-  <MainLayout title="📘 Đề thi" navigation={navigation}>
-
-    {/* TOP BAR: TẠO + SEARCH */}
-    <View style={styles.topBar}>
-
-    <TextInput
-        placeholder="🔍 Tìm kiếm đề thi..."
-        value={search}
-        onChangeText={setSearch}
-        style={styles.search}
+      {/* LIST */}
+      <FlatList
+        data={filteredData}
+        keyExtractor={(item) =>
+          item.MaDe.toString()
+        }
+        renderItem={renderItem}
+        contentContainerStyle={{
+          paddingBottom: 30,
+        }}
+        showsVerticalScrollIndicator={
+          false
+        }
       />
-      <TouchableOpacity
-        style={styles.addBtn}
-        onPress={() => navigation.navigate("CreateDeThiScreen")}
-      >
-        <Text style={{ color: "#fff", fontWeight: "bold" }}>
-          + Tạo đề
-        </Text>
-      </TouchableOpacity>
-
-    </View>
-
-    {/* LIST */}
-    <FlatList
-      data={filteredData}
-      keyExtractor={(item) => item.MaDe.toString()}
-      renderItem={renderItem}
-    />
-
-  </MainLayout>
-);
+    </MainLayout>
+  );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#fff",
-    padding: 15,
-    margin: 10,
-    borderRadius: 10,
+  center: {
+    flex: 1,
+    justifyContent:
+      "center",
+    alignItems: "center",
   },
-  title: { fontWeight: "bold", fontSize: 16 },
-  row: { flexDirection: "row", marginTop: 10 },
-  btn: {
-    backgroundColor: "#2196F3",
-    padding: 8,
-    marginRight: 5,
-    borderRadius: 6,
+
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    marginTop: 10,
+    marginBottom: 5,
   },
-  delete: {
-    backgroundColor: "red",
-    padding: 8,
-    borderRadius: 6,
+
+  search: {
+    flex: 1,
+    backgroundColor:
+      "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
 
   addBtn: {
-  backgroundColor: "#2ecc71",
-  padding: 12,
-  borderRadius: 10,
-  alignItems: "center",
-  margin: 10,
-},
+    backgroundColor:
+      "#2ecc71",
+    marginLeft: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
 
-topBar: {
-  flexDirection: "row",
-  alignItems: "center",
-  margin: 10,
-  gap: 10,
-},
+  addBtnText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
 
-search: {
-  flex: 1,
-  backgroundColor: "#fff",
-  padding: 10,
-  borderRadius: 10,
-  borderWidth: 1,
-  borderColor: "#ddd",
-},
+  card: {
+    backgroundColor:
+      "#fff",
+    marginHorizontal: 10,
+    marginTop: 12,
+    borderRadius: 16,
+    padding: 16,
 
+    elevation: 3,
+  },
+
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#222",
+  },
+
+  info: {
+    color: "#555",
+    marginBottom: 4,
+  },
+
+  row: {
+    flexDirection: "row",
+    marginTop: 15,
+    justifyContent:
+      "space-between",
+  },
+
+  detailBtn: {
+    flex: 1,
+    backgroundColor:
+      "#3498db",
+    padding: 10,
+    borderRadius: 10,
+    alignItems: "center",
+    marginRight: 5,
+  },
+
+  editBtn: {
+    flex: 1,
+    backgroundColor:
+      "#f39c12",
+    padding: 10,
+    borderRadius: 10,
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+
+  deleteBtn: {
+    flex: 1,
+    backgroundColor:
+      "#e74c3c",
+    padding: 10,
+    borderRadius: 10,
+    alignItems: "center",
+    marginLeft: 5,
+  },
+
+  btnText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+
+  empty: {
+    alignItems: "center",
+    marginTop: 40,
+  },
+
+  emptyText: {
+    color: "#888",
+    fontSize: 16,
+  },
 });
