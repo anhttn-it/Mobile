@@ -122,20 +122,12 @@ export const deleteCauHoi = async (id, userId) => {
 // =====================
 // 5. IMPORT FILE CSV
 // =====================
-export const importCauHoi = async (file, maMonHoc, userId) => {
-  if (!file || !maMonHoc || !userId) {
-    throw new Error("Thiếu dữ liệu import");
-  }
-
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("maMonHoc", maMonHoc);
-  formData.append("userId", userId);
-
+export const importCauHoi = async (formData) => {
   return fetch(`${BASE_URL}/import`, {
     method: "POST",
     body: formData,
     headers: {
+      Accept: "application/json",
       "ngrok-skip-browser-warning": "true",
     },
   }).then(async (res) => {
@@ -154,11 +146,13 @@ export const importCauHoi = async (file, maMonHoc, userId) => {
 export const getCauHoiDetail = async (id, userId) => {
   if (!id || !userId) throw new Error("Thiếu dữ liệu");
 
-  return safeFetch(`${BASE_URL}/detail/${id}?userId=${userId}`, {
+  const res = await safeFetch(`${BASE_URL}/detail/${id}?userId=${userId}`, {
     method: "GET",
   });
-};
 
+  console.log("🔥 DETAIL RAW:", res);
+  return res;
+};
 
 
 export const getMonHocByUser = async (userId) => {

@@ -1,4 +1,9 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, {
+  useEffect,
+  useState,
+  useContext,
+} from "react";
+
 import {
   View,
   Text,
@@ -6,32 +11,61 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 
+import { Linking } from "react-native";
 
 import { getDeThiDetail } from "../../api/dethi";
+
 import { AuthContext } from "../../context/AuthContext";
 
-export default function DeThiDetailScreen({ route, navigation }) {
+export default function DeThiDetailScreen({
+  route,
+  navigation,
+}) {
   const { id } = route.params;
+
   const { user } = useContext(AuthContext);
 
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
 
+  const [loading, setLoading] =
+    useState(true);
+
+  // ================= LOAD DATA =================
   const load = async () => {
     try {
-      const res = await getDeThiDetail(id, user.userId);
+      setLoading(true);
+
+      const res = await getDeThiDetail(
+        id,
+        user.userId
+      );
+
+      console.log("DETAIL:", res);
+
       setData(res);
     } catch (err) {
-      console.log("❌ DETAIL ERROR:", err);
+      console.log(
+        "❌ DETAIL ERROR:",
+        err.message
+      );
+
+      Alert.alert(
+        "Lỗi",
+        err.message ||
+          "Không tải được đề thi"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (user?.userId) load();
+    if (user?.userId) {
+      load();
+    }
   }, [user]);
 
   // ================= LOADING =================
@@ -39,7 +73,19 @@ export default function DeThiDetailScreen({ route, navigation }) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
-        <Text>Đang tải đề thi...</Text>
+
+        <Text style={{ marginTop: 10 }}>
+          Đang tải đề thi...
+        </Text>
+      </View>
+    );
+  }
+
+  // ================= NO DATA =================
+  if (!data) {
+    return (
+      <View style={styles.center}>
+        <Text>Không có dữ liệu</Text>
       </View>
     );
   }
@@ -47,68 +93,142 @@ export default function DeThiDetailScreen({ route, navigation }) {
   // ================= UI =================
   return (
     <View style={styles.container}>
-      
       {/* ===== TOP BAR ===== */}
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>← Quay lại</Text>
+        <TouchableOpacity
+          onPress={() =>
+            navigation.goBack()
+          }
+        >
+          <Text style={styles.back}>
+            ← Quay lại
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.startBtn}
-          onPress={() =>
-            navigation.navigate("LamBai", { id: data.MaDe })
-          }
-        >
-          <Text style={{ color: "#fff" }}>Làm bài</Text>
-        </TouchableOpacity>
+  style={styles.startBtn}
+onPress={() => {
+  const url =
+    `https://glare-legwork-snooper.ngrok-free.dev/Pdf/Export?maDe=${data.MaDe}`;
+
+  Linking.openURL(url);
+}}
+>
+  <Text style={styles.startText}>
+    Xuất PDF
+  </Text>
+</TouchableOpacity>
       </View>
 
       {/* ===== HEADER ===== */}
       <View style={styles.header}>
-        <Text style={styles.title}>📘 {data.TenDe}</Text>
+        <Text style={styles.title}>
+          📘 {data.TenDe}
+        </Text>
 
         <Text style={styles.info}>
-          Tổng câu:{" "}
-          {data.SoCauDe + data.SoCauTrungBinh + data.SoCauKho}
+          📚 Môn học:{" "}
+          {data.TenMonHoc}
+        </Text>
+
+        {data.TenNhom && (
+          <Text style={styles.info}>
+            👥 Nhóm: {data.TenNhom}
+          </Text>
+        )}
+
+        <Text style={styles.info}>
+          ⏱ Thời gian thi:{" "}
+          {data.ThoiGianThi} phút
+        </Text>
+
+        <Text style={styles.info}>
+          📝 Tổng số câu:
+          {" "}
+          {data.SoCauDe +
+            data.SoCauTrungBinh +
+            data.SoCauKho}
         </Text>
 
         <View style={styles.badgeRow}>
-          <Text style={styles.badge}>Dễ: {data.SoCauDe}</Text>
-          <Text style={styles.badge}>TB: {data.SoCauTrungBinh}</Text>
-          <Text style={styles.badge}>Khó: {data.SoCauKho}</Text>
+          <Text style={styles.badge}>
+            Dễ: {data.SoCauDe}
+          </Text>
+
+          <Text style={styles.badge}>
+            TB:{" "}
+            {data.SoCauTrungBinh}
+          </Text>
+
+          <Text style={styles.badge}>
+            Khó: {data.SoCauKho}
+          </Text>
         </View>
       </View>
 
-      {/* ===== LIST ===== */}
+      {/* ===== LIST CÂU HỎI ===== */}
       <FlatList
-        data={data.cauHoi}
-        keyExtractor={(item, index) => index.toString()}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        renderItem={({ item, index }) => (
+        data={data.CauHoi}
+        keyExtractor={(item) =>
+          item.MaCauHoi.toString()
+        }
+        contentContainerStyle={{
+          paddingBottom: 30,
+        }}
+        showsVerticalScrollIndicator={
+          false
+        }
+        renderItem={({
+          item,
+          index,
+        }) => (
           <View style={styles.card}>
+            {/* ===== CÂU HỎI ===== */}
             <Text style={styles.question}>
-              Câu {index + 1}: {item.NoiDung}
+              Câu {index + 1}:{" "}
+              {item.NoiDung}
             </Text>
 
-            {item.DapAns?.map((a, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.answer,
-                  a.LaDapAn && styles.correctAnswer, // highlight đáp án đúng
-                ]}
-              >
-                <Text
+            {/* ===== ĐỘ KHÓ ===== */}
+            <Text style={styles.level}>
+              Độ khó:
+              {" "}
+              {item.DoKho === 1
+                ? " Dễ"
+                : item.DoKho === 2
+                ? " Trung bình"
+                : " Khó"}
+            </Text>
+
+            {/* ===== ĐÁP ÁN ===== */}
+            {item.DapAns?.map(
+              (a, i) => (
+                <View
+                  key={i}
                   style={[
-                    styles.answerText,
-                    a.LaDapAn && styles.correctText,
+                    styles.answer,
+                    a.LaDapAn &&
+                      styles.correctAnswer,
                   ]}
                 >
-                  {String.fromCharCode(65 + i)}. {a.NoiDungTraLoi}
-                </Text>
-              </View>
-            ))}
+                  <Text
+                    style={[
+                      styles.answerText,
+                      a.LaDapAn &&
+                        styles.correctText,
+                    ]}
+                  >
+                    {String.fromCharCode(
+                      65 + i
+                    )}
+                    .{" "}
+                    {
+                      a.NoiDungTraLoi
+                    }
+                  </Text>
+                </View>
+              )
+            )}
           </View>
         )}
       />
@@ -116,12 +236,13 @@ export default function DeThiDetailScreen({ route, navigation }) {
   );
 }
 
-
 const styles = StyleSheet.create({
+  // ===== CONTAINER =====
   container: {
     flex: 1,
     backgroundColor: "#f2f4f8",
-    padding: 15,
+    paddingHorizontal: 15,
+    paddingTop: 40,
   },
 
   center: {
@@ -130,92 +251,112 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  // ===== TOP =====
+  // ===== TOP BAR =====
   topBar: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     alignItems: "center",
-    marginTop: 40,
-    marginBottom: 10,
+    marginBottom: 15,
   },
 
   back: {
-    color: "#2196F3",
-    fontWeight: "bold",
     fontSize: 16,
+    fontWeight: "bold",
+    color: "#2196F3",
   },
 
   startBtn: {
     backgroundColor: "#2ecc71",
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+
+  startText: {
+    color: "#fff",
+    fontWeight: "bold",
   },
 
   // ===== HEADER =====
   header: {
     backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
+    borderRadius: 15,
+    padding: 16,
+    marginBottom: 15,
     elevation: 3,
   },
 
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 5,
+    marginBottom: 10,
+    color: "#222",
   },
 
   info: {
-    color: "#666",
-    marginBottom: 5,
+    fontSize: 14,
+    color: "#555",
+    marginBottom: 6,
   },
 
   badgeRow: {
     flexDirection: "row",
+    marginTop: 10,
   },
 
   badge: {
     backgroundColor: "#2196F3",
     color: "#fff",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 8,
-    marginRight: 5,
+    marginRight: 8,
     fontSize: 12,
+    overflow: "hidden",
   },
 
   // ===== CARD =====
   card: {
     backgroundColor: "#fff",
+    borderRadius: 15,
     padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
+    marginBottom: 12,
     elevation: 2,
   },
 
   question: {
+    fontSize: 16,
     fontWeight: "bold",
+    color: "#222",
     marginBottom: 10,
-    fontSize: 15,
   },
 
+  level: {
+    marginBottom: 10,
+    color: "#666",
+    fontStyle: "italic",
+  },
+
+  // ===== ANSWER =====
   answer: {
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    marginBottom: 5,
     backgroundColor: "#f8f9fa",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginBottom: 8,
   },
 
   answerText: {
     color: "#333",
+    fontSize: 14,
   },
 
-  // highlight đáp án đúng
+  // ===== CORRECT =====
   correctAnswer: {
     backgroundColor: "#d4edda",
+    borderWidth: 1,
+    borderColor: "#28a745",
   },
 
   correctText: {

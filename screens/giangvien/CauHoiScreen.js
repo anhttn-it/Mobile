@@ -14,10 +14,15 @@ import {
 
 import MainLayout from "../../components/MainLayout";
 import { AuthContext } from "../../context/AuthContext";
-import { getCauHoi, createCauHoi, deleteCauHoi, getMonHocByUser } from "../../api/cauhoi";
+import { getCauHoi, createCauHoi, deleteCauHoi, getMonHocByUser,importCauHoi } from "../../api/cauhoi";
+import * as DocumentPicker from "expo-document-picker";
 
 export default function CauHoiScreen({ navigation }) {
   
+  const [importVisible, setImportVisible] = useState(false);
+const [importFile, setImportFile] = useState(null);
+const [importMonHoc, setImportMonHoc] = useState(null);
+const [openImportMonHoc, setOpenImportMonHoc] = useState(false);
   const [openMonHoc, setOpenMonHoc] = useState(false);
   // =====================
   // CONTEXT (FIX: đặt lên trước useEffect)
@@ -112,49 +117,116 @@ export default function CauHoiScreen({ navigation }) {
   // =====================
   // CREATE
   // =====================
+const pickFile = async () => {
+  try {
+    const res = await DocumentPicker.getDocumentAsync({
+      type: "text/csv",
+    });
+
+    if (res.canceled) return;
+
+    setImportFile(res.assets[0]);
+  } catch (err) {
+    Alert.alert("Lỗi chọn file");
+  }
+};
+const handleImport = async () => {
+  try {
+    console.log("FILE:", importFile);
+    console.log("MON HOC:", importMonHoc);
+
+    // 🔥 FIX 1: dùng importMonHoc (KHÔNG dùng selectedMonHoc)
+    if (!importFile || !importMonHoc) {
+      Alert.alert("Thiếu file hoặc môn học");
+      return;
+    }
+
+    const formData = new FormData();
+
+    formData.append("file", {
+      uri: importFile.uri,
+      name: importFile.name || "file.csv",
+      type: importFile.mimeType || "text/csv",
+    });
+
+    // 🔥 FIX 2: ép string cho chắc chắn
+    formData.append("maMonHoc", String(importMonHoc));
+    formData.append("userId", String(user.userId));
+
+    console.log("FORM DATA:", formData);
+
+    await importCauHoi(formData);
+
+    Alert.alert("Thành công", "Import câu hỏi thành công");
+
+    setImportVisible(false);
+    setImportFile(null);
+    setImportMonHoc(null);
+
+  } catch (err) {
+    console.log("IMPORT ERROR:", err);
+    Alert.alert("Lỗi import", err.message);
+  }
+};
+const openImport = () => {
+  setModalVisible(false);
+  setTimeout(() => {
+    setImportVisible(true);
+  }, 300);
+};
+
   const handleCreate = async () => {
-    try {
-      if (!noiDung.trim()) {
-        Alert.alert("Thiếu thông tin", "Vui lòng nhập nội dung câu hỏi");
-        return;
-      }
+  try {
+    if (!noiDung.trim()) {
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập nội dung câu hỏi");
+      return;
+    }
 
-      if (!selectedMonHoc) {
-        Alert.alert("Thiếu thông tin", "Vui lòng chọn môn học");
-        return;
-      }
+    if (!selectedMonHoc) {
+      Alert.alert("Thiếu thông tin", "Vui lòng chọn môn học");
+      return;
+    }
 
-      if (!user?.userId) {
-        Alert.alert("Lỗi", "Không tìm thấy user");
-        return;
-      }
+    // ❌ FIX: check đủ 4 đáp án
+    if (dapAn.some(a => !a || !a.trim())) {
+      Alert.alert("Thiếu đáp án", "Vui lòng nhập đủ 4 đáp án");
+      return;
+    }
 
-      const payload = {
+    if (dapAnDung === null || dapAnDung === undefined) {
+      Alert.alert("Thiếu đáp án đúng", "Vui lòng chọn đáp án đúng");
+      return;
+    }
+
+    const payload = {
       NoiDung: noiDung.trim(),
-      DoKho: parseInt(doKho),
-      MaMonHoc: selectedMonHoc,
-      dapAn: dapAn,
-      dapAnDung: dapAnDung,
+      DoKho: Number(doKho),
+      MaMonHoc: Number(selectedMonHoc),
+      dapAn: dapAn.map(x => x.trim()),
+      dapAnDung: Number(dapAnDung),
       userId: user.userId,
     };
 
-      console.log("📤 CREATE CAUHOI:", payload);
+    console.log("📤 CREATE CAUHOI:", payload);
 
-      await createCauHoi(payload);
+    await createCauHoi(payload);
 
-      Alert.alert("Thành công", "Tạo câu hỏi thành công");
+    Alert.alert("Thành công", "Tạo câu hỏi thành công");
 
-      setNoiDung("");
-      setDoKho("1");
-      setSelectedMonHoc(null);
-      setModalVisible(false);
+    // reset form
+    setNoiDung("");
+    setDoKho("1");
+    setSelectedMonHoc(null);
+    setDapAn(["", "", "", ""]);
+    setDapAnDung(0);
+    setModalVisible(false);
 
-      loadData();
-    } catch (err) {
-      console.log(err);
-      Alert.alert("Lỗi", err?.message || "Không thể tạo câu hỏi");
-    }
-  };
+    loadData();
+  } catch (err) {
+    console.log(err);
+    Alert.alert("Lỗi", err?.message || "Không thể tạo câu hỏi");
+  }
+};
 
   // =====================
   // DELETE
@@ -257,6 +329,16 @@ export default function CauHoiScreen({ navigation }) {
           <View style={styles.modal}>
 
             <Text style={styles.modalTitle}>➕ Tạo câu hỏi</Text>
+
+            <TouchableOpacity
+  style={[styles.addBtn, { backgroundColor: "#2ecc71", marginLeft: 8 }]}
+  onPress={() => {
+  setModalVisible(false);
+  setImportVisible(true);
+}}
+>
+  <Text style={{ color: "#fff" }}>Import</Text>
+</TouchableOpacity>
 
             <TextInput
               placeholder="Nội dung"
@@ -373,6 +455,98 @@ export default function CauHoiScreen({ navigation }) {
 
           </View>
         </Modal>
+        <Modal visible={importVisible} animationType="slide">
+        <Text style={styles.label}>Môn học</Text>
+
+<TouchableOpacity
+  style={styles.dropdownHeader}
+  onPress={() => setOpenMonHoc(!openMonHoc)}
+>
+  <Text>
+    {selectedMonHoc
+      ? monHocList.find(x => x.MaMonHoc === selectedMonHoc)?.TenMonHoc
+      : "Chọn môn học"}
+  </Text>
+</TouchableOpacity>
+
+{openMonHoc && (
+  <View style={styles.dropdownBox}>
+    {monHocList.map((item) => (
+      <TouchableOpacity
+        key={item.MaMonHoc}
+        onPress={() => {
+          setSelectedMonHoc(item.MaMonHoc);
+          setOpenMonHoc(false);
+        }}
+        style={styles.dropdownItem}
+      >
+        <Text>{item.TenMonHoc}</Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+)}
+  <View style={styles.modal}>
+
+    <Text style={styles.modalTitle}>📥 Import CSV</Text>
+
+    {/* CHỌN MÔN HỌC */}
+    <Text style={styles.label}>Môn học</Text>
+
+    <TouchableOpacity
+      style={styles.dropdownHeader}
+      onPress={() => setOpenImportMonHoc(!openImportMonHoc)}
+    >
+      <Text>
+        {importMonHoc
+          ? monHocList.find(x => x.MaMonHoc === importMonHoc)?.TenMonHoc
+          : "Chọn môn học"}
+      </Text>
+    </TouchableOpacity>
+
+    {openImportMonHoc && (
+      <View style={styles.dropdownBox}>
+        {monHocList.map((item) => {
+          const isSelected = importMonHoc === item.MaMonHoc;
+
+          return (
+            <TouchableOpacity
+              key={item.MaMonHoc}
+              style={[
+                styles.dropdownItem,
+                isSelected && styles.dropdownActive,
+              ]}
+              onPress={() => {
+                setImportMonHoc(item.MaMonHoc);
+                setOpenImportMonHoc(false);
+              }}
+            >
+              <Text style={{ color: isSelected ? "#fff" : "#000" }}>
+                {item.TenMonHoc}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    )}
+
+    {/* CHỌN FILE */}
+    <TouchableOpacity style={styles.btn} onPress={pickFile}>
+      <Text style={{ color: "#fff" }}>
+        {importFile ? importFile.name : "Chọn file CSV"}
+      </Text>
+    </TouchableOpacity>
+
+    {/* IMPORT */}
+    <TouchableOpacity style={styles.btn} onPress={handleImport}>
+      <Text style={{ color: "#fff" }}>IMPORT</Text>
+    </TouchableOpacity>
+
+    <TouchableOpacity onPress={() => setImportVisible(false)}>
+      <Text style={styles.close}>Đóng</Text>
+    </TouchableOpacity>
+
+  </View>
+</Modal>
 
       </View>
     </MainLayout>
