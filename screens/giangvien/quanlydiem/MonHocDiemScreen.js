@@ -1,149 +1,211 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState } from "react";
+
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
-  TextInput,
-  SafeAreaView,
-  StatusBar,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 
-import { getMonHoc } from "../../../api/monhoc";
-import { AuthContext } from "../../../context/AuthContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import MainLayout from "../../../components/MainLayout";
+
+import { getMonHocDiem } from "../../../api/quanlydiem";
 
 export default function MonHocDiemScreen({ navigation }) {
-  const { user } = useContext(AuthContext);
-
-  const [data, setData] = useState([]);
-  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [monHoc, setMonHoc] = useState([]);
+  const [userId, setUserId] = useState(null);
 
-  const load = async () => {
+  useEffect(() => {
+    init();
+  }, []);
+
+  const init = async () => {
     try {
-      const res = await getMonHoc(user.userId, "");
-      setData(res?.data || []);
+      setLoading(true);
+
+      const raw = await AsyncStorage.getItem("user");
+
+      if (!raw) throw new Error("Chưa đăng nhập");
+
+      const user = JSON.parse(raw);
+
+      const uid =
+        user?.userId ||
+        user?.UserId ||
+        user?.Id ||
+        user?.id;
+
+      if (!uid) throw new Error("Không tìm thấy userId");
+
+      setUserId(uid);
+
+      const res = await getMonHocDiem(uid);
+
+      if (Array.isArray(res)) {
+        setMonHoc(res);
+      } else if (Array.isArray(res?.data)) {
+        setMonHoc(res.data);
+      } else {
+        setMonHoc([]);
+      }
     } catch (err) {
-      setData([]);
+      console.log(err);
+      Alert.alert("Lỗi", err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  const filteredData = data.filter(item =>
-    item.TenMonHoc?.toLowerCase().includes(search.toLowerCase())
-  );
-
   if (loading) {
     return (
-      <SafeAreaView style={styles.center}>
-        <Text>Đang tải môn học...</Text>
-      </SafeAreaView>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#2563eb" />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>← Quay lại</Text>
+    <MainLayout title="Quản lý điểm" navigation={navigation}>
+      
+      {/* ================= BACK BUTTON (FIXED) ================= */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
-
-        <Text style={styles.title}>📚 Môn học (Điểm)</Text>
       </View>
 
-      {/* SEARCH */}
-      <TextInput
-        placeholder="🔍 Tìm môn học..."
-        value={search}
-        onChangeText={setSearch}
-        style={styles.search}
-      />
-
-      {/* LIST */}
       <FlatList
-        data={filteredData}
-        keyExtractor={(i) => i.MaMonHoc.toString()}
+        data={monHoc}
+        keyExtractor={(item) => item.MaMonHoc.toString()}
+        contentContainerStyle={{ padding: 10, paddingTop: 0 }}
         ListEmptyComponent={
-          <Text style={styles.empty}>❌ Không tìm thấy môn học</Text>
+          <Text style={styles.empty}>Không có môn học</Text>
         }
         renderItem={({ item }) => (
           <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.8}
             onPress={() =>
               navigation.navigate("NhomTheoMon", {
+                userId,
                 maMonHoc: item.MaMonHoc,
+                tenMonHoc: item.TenMonHoc,
               })
             }
-            style={styles.card}
           >
-            <Text style={styles.cardTitle}>📘 {item.TenMonHoc}</Text>
+            <View style={styles.iconBox}>
+              <Text style={styles.icon}>📘</Text>
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>{item.TenMonHoc}</Text>
+              <Text style={styles.subtitle}>
+                Mã môn: {item.MaMonHoc}
+              </Text>
+            </View>
+
+            <Text style={styles.arrow}>›</Text>
           </TouchableOpacity>
         )}
       />
-    </SafeAreaView>
+    </MainLayout>
   );
 }
 
-const styles = {
-  container: {
-    flex: 1,
-    backgroundColor: "#f2f4f8",
-    paddingHorizontal: 15,
-  },
-
+const styles = StyleSheet.create({
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
 
-  header: {
-    marginTop: 10,
-    marginBottom: 10,
+  empty: {
+    textAlign: "center",
+    marginTop: 40,
+    fontSize: 16,
+    color: "#666",
   },
 
-  back: {
-    color: "#2196F3",
+  // ===== NEW HEADER ROW (SPACE FIX) =====
+  headerRow: {
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 5,
+  },
+
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#ffffff",
+    justifyContent: "center",
+    alignItems: "center",
+
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+
+  backIcon: {
+    fontSize: 26,
+    color: "#2563eb",
     fontWeight: "bold",
-    marginBottom: 10,
-  },
-
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-
-  search: {
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 10,
-    elevation: 2,
+    marginTop: -2,
   },
 
   card: {
     backgroundColor: "#fff",
-    padding: 15,
-    marginBottom: 10,
-    borderRadius: 12,
-    elevation: 3,
+    marginBottom: 14,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
   },
 
-  cardTitle: {
-    fontSize: 16,
+  iconBox: {
+    width: 55,
+    height: 55,
+    borderRadius: 14,
+    backgroundColor: "#dbeafe",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+
+  icon: {
+    fontSize: 28,
+  },
+
+  title: {
+    fontSize: 17,
     fontWeight: "bold",
+    color: "#111827",
   },
 
-  empty: {
-    textAlign: "center",
-    marginTop: 20,
-    color: "#888",
+  subtitle: {
+    marginTop: 5,
+    color: "#6b7280",
+    fontSize: 14,
   },
-};
+
+  arrow: {
+    fontSize: 28,
+    color: "#9ca3af",
+    marginLeft: 10,
+  },
+});

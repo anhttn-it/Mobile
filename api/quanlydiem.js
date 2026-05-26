@@ -1,58 +1,155 @@
 import { API_URL } from "./config";
 
-/* ================= NHÓM THEO GIẢNG VIÊN ================= */
-export const getNhomByMon = async (maMonHoc, userId) => {
-  const res = await fetch(
-    `${API_URL}/api/nhom?userId=${userId}`
-  );
+const BASE_URL =
+  `${API_URL}/api/QuanLyDiemApi`;
 
-  const json = await res.json();
+const safeFetch = async (
+  url,
+  options = {}
+) => {
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type":
+          "application/json",
+        Accept: "application/json",
+        "ngrok-skip-browser-warning":
+          "true",
+      },
+    });
 
-  // lọc theo môn
-  return json.filter(x => x.MaMonHoc === maMonHoc);
+    const text = await res.text();
+
+    let data = null;
+
+    try {
+      data = text
+        ? JSON.parse(text)
+        : null;
+    } catch {
+      throw new Error(
+        "Server trả dữ liệu lỗi"
+      );
+    }
+
+    if (!res.ok) {
+      throw new Error(
+        data?.Message ||
+          data?.message ||
+          "API lỗi"
+      );
+    }
+
+    return data;
+  } catch (err) {
+    console.log(
+      "QUANLYDIEM API ERROR:",
+      err.message
+    );
+
+    throw err;
+  }
 };
 
-/* ================= ĐỀ THI ================= */
-export const getDeThi = async (userId, maNhom) => {
-  const res = await fetch(
-    `${API_URL}/api/dethi/list?userId=${userId}`
-  );
+// ================= MÔN HỌC =================
 
-  const json = await res.json();
+export const getMonHocDiem =
+  async (userId) => {
+    return safeFetch(
+      `${BASE_URL}/MonHoc?userId=${userId}`,
+      {
+        method: "GET",
+      }
+    );
+  };
 
-  const data = json.data || json;
+// ================= NHÓM =================
 
-  // lọc theo nhóm
-  return data.filter(x => x.MaNhom === maNhom);
-};
-/* ================= ĐÃ NỘP ================= */
-export const getDaNop = async (maDe) => {
-  const res = await fetch(`${API_URL}/api/ketqua/danop?maDe=${maDe}`);
-  return res.json();
-};
+export const getNhomTheoMon =
+  async (
+    userId,
+    maMonHoc
+  ) => {
+    return safeFetch(
+      `${BASE_URL}/NhomTheoMon?userId=${userId}&maMonHoc=${maMonHoc}`,
+      {
+        method: "GET",
+      }
+    );
+  };
 
-/* ================= CHƯA NỘP ================= */
-export const getChuaNop = async (maDe, maNhom) => {
-  const res = await fetch(
-    `${API_URL}/api/ketqua/chuanop?maDe=${maDe}&maNhom=${maNhom}`
-  );
-  return res.json();
-};
+// ================= ĐỀ =================
 
-/* ================= THỐNG KÊ ================= */
-export const getThongKe = async (maDe) => {
-  const res = await fetch(`${API_URL}/api/diem/thongke?maDe=${maDe}`);
-  return res.json();
-};
+export const getDanhSachDe =
+  async (maNhom) => {
+    return safeFetch(
+      `${BASE_URL}/DanhSachDe?maNhom=${maNhom}`,
+      {
+        method: "GET",
+      }
+    );
+  };
 
-/* ================= EXPORT ================= */
-export const exportCSVUrl = (maDe) =>
-  `${API_URL}/api/diem/exportcsv?maDe=${maDe}`;
+// ================= ĐÃ NỘP =================
 
-/* ================= CHI TIẾT BÀI LÀM ================= */
-export const getChiTiet = async (maKetQua) => {
-  const res = await fetch(
-    `${API_URL}/api/ketqua/chitiet?maKetQua=${maKetQua}`
-  );
-  return res.json();
-};
+export const getDaNop =
+  async (maDe) => {
+    return safeFetch(
+      `${BASE_URL}/DaNop?maDe=${maDe}`,
+      {
+        method: "GET",
+      }
+    );
+  };
+
+// ================= CHƯA NỘP =================
+
+export const getChuaNop =
+  async (
+    maDe,
+    maNhom
+  ) => {
+    return safeFetch(
+      `${BASE_URL}/ChuaNop?maDe=${maDe}&maNhom=${maNhom}`,
+      {
+        method: "GET",
+      }
+    );
+  };
+
+// ================= THỐNG KÊ ĐIỂM =================
+
+export const getThongKeDiem =
+  async (maDe) => {
+    return safeFetch(
+      `${BASE_URL}/ThongKeDiem?maDe=${maDe}`,
+      {
+        method: "GET",
+      }
+    );
+  };
+
+// ================= THỐNG KÊ CÂU HỎI =================
+
+export const getThongKeCauHoi =
+  async (maDe) => {
+    return safeFetch(
+      `${BASE_URL}/ThongKeCauHoi?maDe=${maDe}`,
+      {
+        method: "GET",
+      }
+    );
+  };
+
+// ================= CHI TIẾT =================
+
+export const getChiTietBaiLam =
+  async (maKetQua) => {
+    return safeFetch(
+      `${BASE_URL}/ChiTietBaiLam?maKetQua=${maKetQua}`,
+      {
+        method: "GET",
+      }
+    );
+  };

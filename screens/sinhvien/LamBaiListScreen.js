@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useContext, useMemo } from "react";
+import React, {
+  useEffect,
+  useState,
+  useContext,
+  useMemo,
+} from "react";
+
 import {
   View,
   Text,
@@ -7,27 +13,67 @@ import {
   TextInput,
   StyleSheet,
   ActivityIndicator,
-  Alert
+  Alert,
 } from "react-native";
 
 import { AuthContext } from "../../context/AuthContext";
 import { getDeThi } from "../../api/lambai";
 import MainLayoutSV from "../../components/MainLayoutSV";
 
-export default function LamBaiListScreen({ navigation }) {
-  const { user } = useContext(AuthContext);
+export default function LamBaiListScreen({
+  navigation,
+}) {
+  const { user } =
+    useContext(AuthContext);
 
-  const [data, setData] = useState([]);
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [data, setData] =
+    useState([]);
+
+  const [search, setSearch] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(true);
+
+  // ================= CHECK OPEN =================
   const isOpen = (item) => {
-  const now = new Date();
+    const now = new Date();
 
-  const start = item.ThoiGianBatDau ? new Date(item.ThoiGianBatDau) : null;
-  const end = item.ThoiGianKetThuc ? new Date(item.ThoiGianKetThuc) : null;
+    const start =
+      item.ThoiGianBatDau
+        ? new Date(
+            item.ThoiGianBatDau
+          )
+        : null;
 
-  return (!start || now >= start) && (!end || now <= end);
-};
+    const end =
+      item.ThoiGianKetThuc
+        ? new Date(
+            item.ThoiGianKetThuc
+          )
+        : null;
+
+    return (
+      (!start || now >= start) &&
+      (!end || now <= end)
+    );
+  };
+
+  // ================= FORMAT TIME =================
+  const formatDateTime = (
+    value
+  ) => {
+    if (!value)
+      return "Không giới hạn";
+
+    try {
+      return new Date(
+        value
+      ).toLocaleString();
+    } catch {
+      return value;
+    }
+  };
 
   // ================= LOAD DATA =================
   useEffect(() => {
@@ -40,165 +86,331 @@ export default function LamBaiListScreen({ navigation }) {
     try {
       setLoading(true);
 
-      const res = await getDeThi(user.userId);
+      const res =
+        await getDeThi(
+          user.userId
+        );
 
-      setData(Array.isArray(res) ? res : []);
-
+      setData(
+        Array.isArray(res)
+          ? res
+          : []
+      );
     } catch (err) {
-      console.log("LOAD DE THI ERROR:", err.message);
+      console.log(
+        "LOAD DE THI ERROR:",
+        err.message
+      );
+
       setData([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // ================= FILTER (OPTIMIZED) =================
+  // ================= FILTER =================
   const filtered = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+    const keyword =
+      search
+        .trim()
+        .toLowerCase();
 
-    if (!keyword) return data;
+    if (!keyword)
+      return data;
 
     return data.filter((x) =>
-      x?.TenDe?.toLowerCase().includes(keyword)
+      x?.TenDe?.toLowerCase().includes(
+        keyword
+      )
     );
   }, [search, data]);
 
   // ================= UI =================
   return (
-    <MainLayoutSV navigation={navigation} title="📚 Danh sách đề thi">
-
+    <MainLayoutSV
+      navigation={navigation}
+      title="📚 Danh sách đề thi"
+    >
       <View style={styles.container}>
-
         {/* SEARCH */}
         <TextInput
           placeholder="🔍 Tìm kiếm đề thi..."
           value={search}
-          onChangeText={setSearch}
+          onChangeText={
+            setSearch
+          }
           style={styles.search}
         />
 
         {/* LOADING */}
         {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color="#3498db" />
-            <Text style={{ marginTop: 10 }}>Đang tải dữ liệu...</Text>
+          <View
+            style={styles.center}
+          >
+            <ActivityIndicator
+              size="large"
+              color="#3498db"
+            />
+
+            <Text
+              style={{
+                marginTop: 10,
+              }}
+            >
+              Đang tải dữ liệu...
+            </Text>
           </View>
-        ) : filtered.length === 0 ? (
-          <View style={styles.center}>
-            <Text>Không có đề thi nào</Text>
+        ) : filtered.length ===
+          0 ? (
+          <View
+            style={styles.center}
+          >
+            <Text>
+              Không có đề thi nào
+            </Text>
           </View>
         ) : (
           <FlatList
             data={filtered}
-            keyExtractor={(i) => i.MaDe.toString()}
-            contentContainerStyle={{ paddingBottom: 20 }}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              
-              <TouchableOpacity
-                onPress={() => {
-                  if (!isOpen(item)) {
-                    Alert.alert("Thông báo", "Đề thi chưa mở hoặc đã hết hạn");
-                    return;
+            keyExtractor={(i) =>
+              i.MaDe.toString()
+            }
+            contentContainerStyle={{
+              paddingBottom: 20,
+            }}
+            showsVerticalScrollIndicator={
+              false
+            }
+            renderItem={({
+              item,
+            }) => {
+              const open =
+                isOpen(item);
+
+              return (
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!open) {
+                      Alert.alert(
+                        "Thông báo",
+                        "Đề thi chưa mở hoặc đã hết hạn"
+                      );
+
+                      return;
+                    }
+
+                    navigation.navigate(
+                      "LamBaiScreen",
+                      {
+                        id: item.MaDe,
+                      }
+                    );
+                  }}
+                  style={
+                    styles.card
                   }
+                >
+                  <Text
+                    style={
+                      styles.title
+                    }
+                  >
+                    📘 {item.TenDe}
+                  </Text>
 
-                  navigation.navigate("LamBaiScreen", { id: item.MaDe });
-                }}
-                style={styles.card}
-              >
+                  <Text
+                    style={
+                      styles.sub
+                    }
+                  >
+                    👥 Lớp:{" "}
+                    {item.TenNhom ||
+                      "Không có lớp"}
+                  </Text>
 
-                <Text style={styles.title}>
-                  📘 {item.TenDe}
-                </Text>
+                  <Text
+                    style={
+                      styles.meta
+                    }
+                  >
+                    ⏱ Thời gian
+                    làm bài:{" "}
+                    {
+                      item.ThoiGianThi
+                    }{" "}
+                    phút
+                  </Text>
 
-                <Text style={styles.sub}>
-                  👥 Lớp: {item.TenNhom || "Không có lớp"}
-                </Text>
+                  <Text
+                    style={
+                      styles.meta
+                    }
+                  >
+                    🕒 Bắt đầu:{" "}
+                    {formatDateTime(
+                      item.ThoiGianBatDau
+                    )}
+                  </Text>
 
-                {/* optional info */}
-                <Text style={styles.meta}>
-                  ⏱ Thời gian: {item.ThoiGianThi || 0} phút
-                </Text>
+                  <Text
+                    style={
+                      styles.meta
+                    }
+                  >
+                    ⌛ Kết thúc:{" "}
+                    {formatDateTime(
+                      item.ThoiGianKetThuc
+                    )}
+                  </Text>
 
-                <Text style={styles.meta}>
-                  🔁 Lượt làm: {item.SoLanLamToiDa || "Không giới hạn"}
-                </Text>
+                  
 
-                <View style={styles.btn}>
-                  <Text style={styles.btnText}>Làm bài →</Text>
-                </View>
+                  <View
+                    style={[
+                      styles.statusBox,
 
-              </TouchableOpacity>
-            )}
+                      open
+                        ? styles.openBox
+                        : styles.closeBox,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+
+                        open
+                          ? styles.openText
+                          : styles.closeText,
+                      ]}
+                    >
+                      {open
+                        ? "🟢 Đang mở"
+                        : "🔴 Chưa mở / Hết hạn"}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={
+                      styles.btn
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.btnText
+                      }
+                    >
+                      Làm bài →
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
           />
         )}
-
       </View>
-
     </MainLayoutSV>
   );
 }
 
 // ================= STYLE =================
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 15,
-    backgroundColor: "#f4f6f9",
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: 15,
+      backgroundColor:
+        "#f4f6f9",
+    },
 
-  search: {
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-  },
+    search: {
+      backgroundColor:
+        "#fff",
+      padding: 12,
+      borderRadius: 12,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor:
+        "#e0e0e0",
+    },
 
-  card: {
-    backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 14,
-    marginBottom: 12,
-    elevation: 2,
-  },
+    card: {
+      backgroundColor:
+        "#fff",
+      padding: 15,
+      borderRadius: 14,
+      marginBottom: 12,
+      elevation: 2,
+    },
 
-  title: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 5,
-    color: "#2c3e50",
-  },
+    title: {
+      fontSize: 16,
+      fontWeight: "bold",
+      marginBottom: 5,
+      color: "#2c3e50",
+    },
 
-  sub: {
-    fontSize: 13,
-    color: "#666",
-    marginBottom: 5,
-  },
+    sub: {
+      fontSize: 13,
+      color: "#666",
+      marginBottom: 5,
+    },
 
-  meta: {
-    fontSize: 12,
-    color: "#888",
-    marginBottom: 3,
-  },
+    meta: {
+      fontSize: 12,
+      color: "#888",
+      marginBottom: 5,
+    },
 
-  btn: {
-    backgroundColor: "#3498db",
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 10,
-  },
+    statusBox: {
+      alignSelf:
+        "flex-start",
+      paddingVertical: 5,
+      paddingHorizontal: 10,
+      borderRadius: 999,
+      marginTop: 8,
+    },
 
-  btnText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
+    openBox: {
+      backgroundColor:
+        "#dcfce7",
+    },
 
-  center: {
-    marginTop: 30,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
+    closeBox: {
+      backgroundColor:
+        "#fee2e2",
+    },
+
+    statusText: {
+      fontSize: 12,
+      fontWeight: "bold",
+    },
+
+    openText: {
+      color: "#15803d",
+    },
+
+    closeText: {
+      color: "#dc2626",
+    },
+
+    btn: {
+      backgroundColor:
+        "#3498db",
+      paddingVertical: 10,
+      borderRadius: 10,
+      alignItems: "center",
+      marginTop: 12,
+    },
+
+    btnText: {
+      color: "#fff",
+      fontWeight: "bold",
+    },
+
+    center: {
+      marginTop: 30,
+      alignItems: "center",
+      justifyContent:
+        "center",
+    },
+  });

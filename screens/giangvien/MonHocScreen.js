@@ -10,6 +10,9 @@ import {
   ActivityIndicator,
   StyleSheet,
   RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 
 import MainLayout from "../../components/MainLayout";
@@ -35,6 +38,7 @@ export default function MonHocScreen({ navigation }) {
   const [editItem, setEditItem] = useState(null);
 
   const [tenMon, setTenMon] = useState("");
+  const [trangThai, setTrangThai] = useState(true);
 
   /* ================= LOAD ================= */
   const load = async () => {
@@ -42,8 +46,7 @@ export default function MonHocScreen({ navigation }) {
       setLoading(true);
 
       const res = await getMonHoc(user.userId, search);
-
-      setData(res.data || []); // ✅ FIX CRASH
+      setData(res?.data || []);
     } catch (err) {
       Alert.alert("Lỗi", err.message);
     } finally {
@@ -55,7 +58,6 @@ export default function MonHocScreen({ navigation }) {
     load();
   }, [search]);
 
-  /* ================= REFRESH ================= */
   const onRefresh = async () => {
     setRefreshing(true);
     await load();
@@ -65,24 +67,26 @@ export default function MonHocScreen({ navigation }) {
   /* ================= SAVE ================= */
   const handleSave = async () => {
     try {
-      if (!tenMon) return;
+      if (!tenMon.trim()) return;
 
       if (editItem) {
         await updateMonHoc(editItem.MaMonHoc, {
           TenMonHoc: tenMon,
-          TrangThai: true,
+          TrangThai: trangThai,
+          GiangVien: user.userId,
         });
       } else {
         await createMonHoc({
           TenMonHoc: tenMon,
           GiangVien: user.userId,
-          TrangThai: true,
+          TrangThai: trangThai,
         });
       }
 
       setModal(false);
       setTenMon("");
       setEditItem(null);
+      setTrangThai(true);
 
       load();
     } catch (err) {
@@ -98,7 +102,7 @@ export default function MonHocScreen({ navigation }) {
         text: "Xóa",
         style: "destructive",
         onPress: async () => {
-          await deleteMonHoc(id);
+          await deleteMonHoc(id, user.userId);
           load();
         },
       },
@@ -112,25 +116,40 @@ export default function MonHocScreen({ navigation }) {
       onPress={() =>
         navigation.navigate("NhomTheoMon", {
           maMonHoc: item.MaMonHoc,
-          tenMon: item.TenMonHoc,
+          tenMonHoc: item.TenMonHoc,
+          userId: user.userId,
         })
       }
     >
-      <Text style={styles.title}>{item.TenMonHoc}</Text>
+      <View style={styles.cardHeader}>
+        <Text style={styles.title}>{item.TenMonHoc}</Text>
+
+        <View
+          style={[
+            styles.badge,
+            item.TrangThai ? styles.badgeOn : styles.badgeOff,
+          ]}
+        >
+          <Text style={styles.badgeText}>
+            {item.TrangThai ? "Hoạt động" : "Kết thúc"}
+          </Text>
+        </View>
+      </View>
 
       <View style={styles.row}>
         <TouchableOpacity
           onPress={() => {
             setEditItem(item);
             setTenMon(item.TenMonHoc);
+            setTrangThai(item.TrangThai);
             setModal(true);
           }}
         >
-          <Text style={{ color: "orange" }}>Sửa</Text>
+          <Text style={{ color: "orange", fontWeight: "600" }}>Sửa</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => handleDelete(item.MaMonHoc)}>
-          <Text style={{ color: "red" }}>Xóa</Text>
+          <Text style={{ color: "red", fontWeight: "600" }}>Xóa</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -139,7 +158,6 @@ export default function MonHocScreen({ navigation }) {
   return (
     <MainLayout title="📘 Môn học" navigation={navigation}>
       <View style={styles.container}>
-
         <TextInput
           placeholder="Tìm môn học..."
           value={search}
@@ -147,11 +165,8 @@ export default function MonHocScreen({ navigation }) {
           style={styles.search}
         />
 
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => setModal(true)}
-        >
-          <Text style={{ color: "#fff" }}>+ Thêm môn</Text>
+        <TouchableOpacity style={styles.addBtn} onPress={() => setModal(true)}>
+          <Text style={{ color: "#fff", fontWeight: "700" }}>+ Thêm môn</Text>
         </TouchableOpacity>
 
         {loading ? (
@@ -167,30 +182,68 @@ export default function MonHocScreen({ navigation }) {
           />
         )}
 
-        {/* MODAL */}
-        <Modal visible={modal} animationType="slide">
-          <View style={styles.modal}>
-            <Text style={styles.title}>
-              {editItem ? "Sửa môn học" : "Thêm môn học"}
-            </Text>
+        {/* ================= MODAL FIX ================= */}
+        <Modal visible={modal} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={{ width: "100%" }}
+            >
+              <ScrollView
+                contentContainerStyle={styles.modalContainer}
+                keyboardShouldPersistTaps="handled"
+              >
+                <View style={styles.modalBox}>
+                  <Text style={styles.title}>
+                    {editItem ? "Sửa môn học" : "Thêm môn học"}
+                  </Text>
 
-            <TextInput
-              placeholder="Tên môn học"
-              value={tenMon}
-              onChangeText={setTenMon}
-              style={styles.input}
-            />
+                  <TextInput
+                    placeholder="Tên môn học"
+                    value={tenMon}
+                    onChangeText={setTenMon}
+                    style={styles.input}
+                  />
 
-            <TouchableOpacity style={styles.btn} onPress={handleSave}>
-              <Text style={{ color: "#fff" }}>Lưu</Text>
-            </TouchableOpacity>
+                  {/* STATUS */}
+                  <View style={styles.statusRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.statusBtn,
+                        trangThai && styles.statusActive,
+                      ]}
+                      onPress={() => setTrangThai(true)}
+                    >
+                      <Text style={styles.statusText}>Hoạt động</Text>
+                    </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => setModal(false)}>
-              <Text style={{ textAlign: "center", marginTop: 10 }}>Đóng</Text>
-            </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.statusBtn,
+                        !trangThai && styles.statusInactive,
+                      ]}
+                      onPress={() => setTrangThai(false)}
+                    >
+                      <Text style={styles.statusText}>Kết thúc</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <TouchableOpacity style={styles.btn} onPress={handleSave}>
+                    <Text style={{ color: "#fff", fontWeight: "700" }}>
+                      Lưu
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => setModal(false)}>
+                    <Text style={{ textAlign: "center", marginTop: 10 }}>
+                      Đóng
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
           </View>
         </Modal>
-
       </View>
     </MainLayout>
   );
@@ -203,25 +256,57 @@ const styles = StyleSheet.create({
   search: {
     borderWidth: 1,
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 10,
+    borderColor: "#ddd",
   },
 
   addBtn: {
-    backgroundColor: "#2f80ed",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-
-  card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#2563eb",
     padding: 12,
     borderRadius: 10,
     marginBottom: 10,
   },
 
-  title: { fontWeight: "bold", fontSize: 16 },
+  card: {
+    backgroundColor: "#fff",
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 12,
+    elevation: 2,
+  },
+
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  title: {
+    fontWeight: "bold",
+    fontSize: 16,
+    flex: 1,
+  },
+
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+
+  badgeOn: {
+    backgroundColor: "#dcfce7",
+  },
+
+  badgeOff: {
+    backgroundColor: "#fee2e2",
+  },
+
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#111827",
+  },
 
   row: {
     flexDirection: "row",
@@ -229,19 +314,71 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
-  modal: { flex: 1, padding: 20, justifyContent: "center" },
-
   input: {
     borderWidth: 1,
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 10,
+    borderColor: "#ddd",
   },
 
   btn: {
-    backgroundColor: "#2f80ed",
+    backgroundColor: "#2563eb",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: "center",
+  },
+
+  /* MODAL FIX */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  modalContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  modalBox: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    elevation: 5,
+  },
+
+  statusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  statusBtn: {
+    flex: 1,
+    padding: 10,
+    marginHorizontal: 5,
+    borderRadius: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+
+  statusActive: {
+    backgroundColor: "#dcfce7",
+    borderColor: "#22c55e",
+  },
+
+  statusInactive: {
+    backgroundColor: "#fee2e2",
+    borderColor: "#ef4444",
+  },
+
+  statusText: {
+    fontWeight: "600",
   },
 });

@@ -25,7 +25,7 @@ const safeFetch = async (url, options = {}) => {
     }
 
     if (!res.ok) {
-      throw new Error(data?.Message || "API error");
+      throw new Error(data?.Message || data || "API error");
     }
 
     return data;
@@ -46,10 +46,19 @@ export const getMonHoc = async (giangVien, search = "") => {
 };
 
 /* ================= CREATE ================= */
+/*
+Backend yêu cầu:
+- mh.GiangVien bắt buộc
+- validate + check trùng nằm server
+*/
 export const createMonHoc = async (data) => {
   return safeFetch(BASE_URL, {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      TenMonHoc: data.TenMonHoc,
+      TrangThai: data.TrangThai ?? true,
+      GiangVien: data.GiangVien,
+    }),
   });
 };
 
@@ -57,20 +66,25 @@ export const createMonHoc = async (data) => {
 export const updateMonHoc = async (id, data) => {
   return safeFetch(`${BASE_URL}/update/${id}`, {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      MaMonHoc: id,
+      TenMonHoc: data.TenMonHoc,
+      TrangThai: data.TrangThai,
+      GiangVien: data.GiangVien, // cần để check quyền
+    }),
   });
 };
 
 /* ================= DELETE ================= */
-export const deleteMonHoc = async (id) => {
-  return safeFetch(`${BASE_URL}/delete/${id}`, {
+export const deleteMonHoc = async (id, giangVien) => {
+  return safeFetch(`${BASE_URL}/delete/${id}?giangVien=${giangVien}`, {
     method: "POST",
   });
 };
 
 /* ================= DETAIL ================= */
-export const getMonHocDetail = async (id) => {
-  return safeFetch(`${BASE_URL}/${id}`, {
+export const getMonHocDetail = async (id, giangVien) => {
+  return safeFetch(`${BASE_URL}/${id}?giangVien=${giangVien}`, {
     method: "GET",
   });
 };

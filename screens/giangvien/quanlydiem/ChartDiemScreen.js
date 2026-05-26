@@ -1,44 +1,172 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, Dimensions } from "react-native";
-import { BarChart } from "react-native-chart-kit";
-import { getThongKe } from "../../../api/quanlydiem";
+import React from "react";
 
-const w = Dimensions.get("window").width;
+import {
+  View,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+} from "react-native";
 
-export default function ChartDiemScreen({ route }) {
-  const { maDe } = route.params;
-  const [data, setData] = useState(null);
+import {
+  createMaterialTopTabNavigator,
+} from "@react-navigation/material-top-tabs";
 
-  useEffect(() => {
-    getThongKe(maDe).then(setData);
-  }, []);
+import MainLayout
+from "../../../components/MainLayout";
 
-  if (!data) return <Text>Loading...</Text>;
+import DaNopTab
+from "./tabs/DaNopTab";
+
+import ChuaNopTab
+from "./tabs/ChuaNopTab";
+
+import BieuDoTab
+from "./tabs/BieuDoTab";
+
+import CauHoiTab
+from "./tabs/CauHoiTab";
+
+const Tab =
+  createMaterialTopTabNavigator();
+
+export default function ChartDiemScreen({
+  route,
+  navigation,
+}) {
+  const {
+    maDe,
+    maNhom,
+    tenDe,
+  } = route.params;
 
   return (
-    <View>
-      <Text>Biểu đồ điểm</Text>
+    <MainLayout
+      title={
+        tenDe ||
+        "Quản lý điểm"
+      }
+      navigation={
+        navigation
+      }
+    >
+      {/* ===== BACK BUTTON ROW ===== */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backIcon}>‹</Text>
+        </TouchableOpacity>
+      </View>
 
-      <BarChart
-        data={{
-          labels: ["<5", "5-7", "7-8", "8+"],
-          datasets: [
+      <Tab.Navigator
+        screenOptions={{
+          tabBarLabelStyle:
             {
-              data: [
-                data.duoi5,
-                data.tu5den7,
-                data.tu7den8,
-                data.tren8
-              ]
-            }
-          ]
+              fontSize: 13,
+              fontWeight:
+                "700",
+              textTransform:
+                "none",
+            },
+
+          tabBarIndicatorStyle:
+            {
+              backgroundColor:
+                "#2563eb",
+              height: 3,
+            },
+
+          tabBarStyle: {
+            backgroundColor:
+              "#fff",
+          },
+
+          tabBarActiveTintColor:
+            "#2563eb",
+
+          tabBarInactiveTintColor:
+            "#6b7280",
+
+          lazy: true,
         }}
-        width={w}
-        height={220}
-        chartConfig={{
-          color: () => "#2e86de"
-        }}
-      />
-    </View>
+      >
+        <Tab.Screen
+          name="Đã nộp"
+        >
+          {() => (
+            <DaNopTab
+              maDe={maDe}
+            />
+          )}
+        </Tab.Screen>
+
+        <Tab.Screen
+          name="Chưa nộp"
+        >
+          {() => (
+            <ChuaNopTab
+              maDe={maDe}
+              maNhom={
+                maNhom
+              }
+            />
+          )}
+        </Tab.Screen>
+
+        <Tab.Screen
+          name="Biểu đồ"
+        >
+          {() => (
+            <BieuDoTab
+              maDe={maDe}
+            />
+          )}
+        </Tab.Screen>
+
+        <Tab.Screen
+          name="% câu hỏi"
+        >
+          {() => (
+            <CauHoiTab
+              maDe={maDe}
+            />
+          )}
+        </Tab.Screen>
+      </Tab.Navigator>
+    </MainLayout>
   );
 }
+
+const styles = StyleSheet.create({
+  // ===== HEADER ROW =====
+  headerRow: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 6,
+    backgroundColor: "#f3f4f6",
+  },
+
+  // ===== BACK BUTTON =====
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#ffffff",
+    justifyContent: "center",
+    alignItems: "center",
+
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+
+  backIcon: {
+    fontSize: 28,
+    color: "#2563eb",
+    fontWeight: "bold",
+    marginTop: -3,
+  },
+});

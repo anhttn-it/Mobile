@@ -1,157 +1,197 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState } from "react";
+
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
-  TextInput,
-  SafeAreaView,
-  StatusBar,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 
-import { getNhomByMon } from "../../../api/quanlydiem";
-import { AuthContext } from "../../../context/AuthContext";
+import MainLayout from "../../../components/MainLayout";
 
-export default function NhomTheoMonScreen({ route, navigation }) {
-  const { maMonHoc } = route.params;
-  const { user } = useContext(AuthContext);
+import { getNhomTheoMon } from "../../../api/quanlydiem";
+
+export default function NhomTheoMonScreen({ navigation, route }) {
+  const { maMonHoc, tenMonHoc, userId } = route.params;
 
   const [data, setData] = useState([]);
-  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await getNhomByMon(maMonHoc, user.userId);
-        setData(res || []);
-      } catch (err) {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+
+      const res = await getNhomTheoMon(userId, maMonHoc);
+
+      console.log("NHOM RESPONSE:", res);
+
+      if (Array.isArray(res)) {
+        setData(res);
+      } else if (Array.isArray(res?.data)) {
+        setData(res.data);
+      } else {
         setData([]);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err) {
+      console.log(err);
+      Alert.alert("Lỗi", err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    load();
-  }, [maMonHoc]);
-
-  // ================= SEARCH =================
-  const filteredData = data.filter(item =>
-    item.TenNhom?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  // ================= LOADING =================
   if (loading) {
     return (
-      <SafeAreaView style={styles.center}>
-        <Text>Đang tải lớp...</Text>
-      </SafeAreaView>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#2563eb" />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>← Quay lại</Text>
+    <MainLayout title={tenMonHoc} navigation={navigation}>
+      
+      {/* ================= BACK BUTTON ================= */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
-
-        <Text style={styles.title}>📚 Danh sách lớp</Text>
       </View>
 
-      {/* SEARCH */}
-      <TextInput
-        placeholder="🔍 Tìm lớp học..."
-        value={search}
-        onChangeText={setSearch}
-        style={styles.search}
-      />
-
-      {/* LIST */}
       <FlatList
-        data={filteredData}
-        keyExtractor={(i) => i.MaNhom.toString()}
+        data={data}
+        keyExtractor={(item) => item.MaNhom.toString()}
+        contentContainerStyle={{ padding: 10, paddingTop: 0 }}
         ListEmptyComponent={
-          <Text style={styles.empty}>
-            ❌ Không tìm thấy lớp
-          </Text>
+          <Text style={styles.empty}>Không có nhóm</Text>
         }
         renderItem={({ item }) => (
           <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.8}
             onPress={() =>
               navigation.navigate("BangDiem", {
                 maNhom: item.MaNhom,
                 tenNhom: item.TenNhom,
+                userId,
               })
             }
-            style={styles.card}
           >
-            <Text style={styles.cardTitle}>
-              🏫 {item.TenNhom}
-            </Text>
+            <View style={styles.iconBox}>
+              <Text style={styles.icon}>👥</Text>
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>{item.TenNhom}</Text>
+
+              <Text style={styles.subtitle}>
+                Sĩ số: {item.SiSo || 0}
+              </Text>
+            </View>
+
+            <Text style={styles.arrow}>›</Text>
           </TouchableOpacity>
         )}
       />
-    </SafeAreaView>
+    </MainLayout>
   );
 }
 
-const styles = {
-  container: {
-    flex: 1,
-    backgroundColor: "#f2f4f8",
-    paddingHorizontal: 15,
-  },
-
+const styles = StyleSheet.create({
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
 
-  header: {
-    marginTop: 10,
-    marginBottom: 10,
+  empty: {
+    textAlign: "center",
+    marginTop: 40,
+    fontSize: 16,
+    color: "#666",
   },
 
-  back: {
-    color: "#2196F3",
+  // ===== BACK BUTTON HEADER =====
+  headerRow: {
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 5,
+  },
+
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#ffffff",
+    justifyContent: "center",
+    alignItems: "center",
+
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+
+  backIcon: {
+    fontSize: 26,
+    color: "#2563eb",
     fontWeight: "bold",
-    marginBottom: 10,
-  },
-
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-
-  search: {
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 10,
-    elevation: 2,
+    marginTop: -2,
   },
 
   card: {
     backgroundColor: "#fff",
-    padding: 15,
-    marginBottom: 10,
-    borderRadius: 12,
-    elevation: 3,
+    marginBottom: 14,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
   },
 
-  cardTitle: {
-    fontSize: 16,
+  iconBox: {
+    width: 55,
+    height: 55,
+    borderRadius: 14,
+    backgroundColor: "#dcfce7",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+
+  icon: {
+    fontSize: 28,
+  },
+
+  title: {
+    fontSize: 17,
     fontWeight: "bold",
+    color: "#111827",
   },
 
-  empty: {
-    textAlign: "center",
-    marginTop: 20,
-    color: "#888",
+  subtitle: {
+    marginTop: 5,
+    color: "#6b7280",
+    fontSize: 14,
   },
-};
+
+  arrow: {
+    fontSize: 28,
+    color: "#9ca3af",
+    marginLeft: 10,
+  },
+});

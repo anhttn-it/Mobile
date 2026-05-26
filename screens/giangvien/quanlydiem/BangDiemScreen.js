@@ -1,269 +1,308 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState } from "react";
+
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
-  TextInput,
-  SafeAreaView,
-  StatusBar,
+  StyleSheet,
+  ActivityIndicator,
+  Share,
 } from "react-native";
 
-import {
-  getDeThiList,
-  getDaNop,
-  getChuaNop,
-  exportCSVUrl
-} from "../../../api/dethi";
+import MainLayout from "../../../components/MainLayout";
 
-import * as FileSystem from "expo-file-system";
-import * as Sharing from "expo-sharing";
-
-import { AuthContext } from "../../../context/AuthContext";
+import { getDanhSachDe } from "../../../api/quanlydiem";
 
 export default function BangDiemScreen({ route, navigation }) {
-  const { user } = useContext(AuthContext);
-  const { tenNhom } = route.params;
+  const { maNhom, tenNhom } = route.params;
 
-  const [deThi, setDeThi] = useState([]);
-  const [daNop, setDaNop] = useState([]);
-  const [chuaNop, setChuaNop] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [search, setSearch] = useState("");
-
-  // ================= LOAD =================
-  const loadDeThi = async () => {
-    try {
-      if (!user?.userId) return;
-
-      const res = await getDeThiList(user.userId);
-      const list = res?.data || res || [];
-
-      const filtered = list.filter(
-        (x) => (x.TenNhom || "") === tenNhom
-      );
-
-      setDeThi(filtered);
-    } catch (err) {
-      console.log(err.message);
-    }
-  };
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadDeThi();
-  }, [tenNhom, user]);
+    loadData();
+  }, []);
 
-  // ================= SELECT ĐỀ =================
-  const selectDe = async (maDe) => {
-    setSelected(maDe);
-
+  const loadData = async () => {
     try {
-      const da = await getDaNop(maDe);
-      const chua = await getChuaNop(maDe);
+      setLoading(true);
 
-      setDaNop(da?.data || da || []);
-      setChuaNop(chua?.data || chua || []);
+      const res = await getDanhSachDe(maNhom);
+
+      if (Array.isArray(res)) {
+        setData(res);
+      } else if (Array.isArray(res?.data)) {
+        setData(res.data);
+      } else {
+        setData([]);
+      }
     } catch (err) {
-      console.log(err.message);
+      console.log(err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // ================= EXPORT =================
-  const downloadCSV = async (maDe) => {
+  const handleExport = async () => {
     try {
-      const url = exportCSVUrl(maDe);
-      const fileUri = FileSystem.documentDirectory + `bangdiem_${maDe}.csv`;
+      if (!data || data.length === 0) return;
 
-      const result = await FileSystem.downloadAsync(url, fileUri);
+      const header = "MaDe,TenDe,ThoiGianThi,SoCau\n";
 
-      if (result.status === 200) {
-        await Sharing.shareAsync(result.uri);
-      }
+      const body = data
+        .map((item) => {
+          const soCau =
+            (item.SoCauDe || 0) +
+            (item.SoCauTrungBinh || 0) +
+            (item.SoCauKho || 0);
+
+          return `${item.MaDe},${item.TenDe},${item.ThoiGianThi},${soCau}`;
+        })
+        .join("\n");
+
+      await Share.share({
+        message: header + body,
+        title: "Export Bảng Điểm",
+      });
     } catch (err) {
       console.log(err);
     }
   };
 
-  // ================= STATS =================
-  const total = daNop.length + chuaNop.length;
-  const percent = total > 0 ? Math.round((daNop.length / total) * 100) : 0;
+  const renderItem = ({ item }) => {
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.8}
+        onPress={() =>
+          navigation.navigate("ChartDiem", {
+            maDe: item.MaDe,
+            maNhom,
+            tenDe: item.TenDe,
+          })
+        }
+      >
+        <View style={styles.header}>
+          <Text style={styles.title} numberOfLines={2}>
+            {item.TenDe}
+          </Text>
 
-  // ================= FILTER =================
-  const filteredData = deThi.filter(item =>
-    item.TenDe?.toLowerCase().includes(search.toLowerCase())
-  );
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>#{item.MaDe}</Text>
+          </View>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Text style={styles.label}>⏱ Thời gian:</Text>
+          <Text style={styles.value}>{item.ThoiGianThi} phút</Text>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Text style={styles.label}>📝 Số câu:</Text>
+          <Text style={styles.value}>
+            {(item.SoCauDe || 0) +
+              (item.SoCauTrungBinh || 0) +
+              (item.SoCauKho || 0)}
+          </Text>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Text style={styles.label}>📅 Bắt đầu:</Text>
+          <Text style={styles.value} numberOfLines={1}>
+            {item.ThoiGianBatDau
+              ? new Date(item.ThoiGianBatDau).toLocaleString()
+              : "---"}
+          </Text>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.viewText}>Xem bảng điểm →</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#2563eb" />
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>← Quay lại</Text>
+    <MainLayout title={tenNhom || "Danh sách đề thi"} navigation={navigation}>
+      
+      {/* ================= BACK BUTTON (NEW) ================= */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>📊 {tenNhom}</Text>
+        <View style={{ marginBottom: 10, alignItems: "flex-end" }}>
+          <TouchableOpacity onPress={handleExport} style={styles.exportBtn}>
+            <Text style={styles.exportText}>Export dữ liệu</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* SEARCH */}
-      <TextInput
-        placeholder="🔍 Tìm đề thi..."
-        value={search}
-        onChangeText={setSearch}
-        style={styles.search}
-      />
-
-      {/* LIST */}
-      <FlatList
-        data={filteredData}
-        keyExtractor={(i, idx) => i.MaDe?.toString() || idx.toString()}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => selectDe(item.MaDe)}
-            style={styles.card}
-          >
-            <Text style={styles.cardTitle}>📝 {item.TenDe}</Text>
-            <Text style={styles.sub}>Lớp: {item.TenNhom}</Text>
-          </TouchableOpacity>
-        )}
-      />
-
-      {/* DETAIL */}
-      {selected && (
-        <View style={styles.detail}>
-
-          {/* EXPORT nhỏ lại */}
-          <TouchableOpacity
-            onPress={() => downloadCSV(selected)}
-            style={styles.export}
-          >
-            <Text style={{ color: "#fff", fontSize: 13 }}>
-              📥 Export CSV
-            </Text>
-          </TouchableOpacity>
-
-          {/* STATS */}
-          <View style={styles.stats}>
-            <Text>📌 Tổng: {total}</Text>
-            <Text>✅ Đã nộp: {daNop.length}</Text>
-            <Text>❌ Chưa nộp: {chuaNop.length}</Text>
-            <Text style={{ fontWeight: "bold" }}>
-              📊 Tỉ lệ: {percent}%
-            </Text>
-          </View>
-
-          {/* ĐÃ NỘP */}
-          <Text style={styles.section}>✅ Đã nộp</Text>
-
-          {daNop.length === 0 ? (
-            <Text style={styles.empty}>Không có dữ liệu</Text>
-          ) : (
-            daNop.map((i, idx) => (
-              <View key={idx} style={styles.item}>
-                <Text>{i.HoTen} - {i.DiemThi ?? 0} điểm</Text>
-              </View>
-            ))
-          )}
-
-          {/* CHƯA NỘP */}
-          <Text style={styles.section}>❌ Chưa nộp</Text>
-
-          {chuaNop.length === 0 ? (
-            <Text style={styles.empty}>Không có dữ liệu</Text>
-          ) : (
-            chuaNop.map((i, idx) => (
-              <View key={idx} style={styles.item}>
-                <Text>{i.HoTen}</Text>
-              </View>
-            ))
-          )}
-
+      {data.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Không có đề thi</Text>
         </View>
+      ) : (
+        <FlatList
+          data={data}
+          keyExtractor={(item) => item.MaDe.toString()}
+          renderItem={renderItem}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 20 }}
+        />
       )}
-    </SafeAreaView>
+    </MainLayout>
   );
 }
 
-const styles = {
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f4f6f9",
-    paddingHorizontal: 15,
+    backgroundColor: "#f3f4f6",
+    padding: 12,
   },
 
-  header: {
-    marginTop: 10,
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  back: {
-    color: "#2196F3",
-    fontWeight: "bold",
-    marginBottom: 8,
+  // ===== BACK HEADER =====
+  headerRow: {
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 5,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-
-  search: {
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: "#fff",
-    padding: 10,
+    justifyContent: "center",
+    alignItems: "center",
+
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+
+  backIcon: {
+    fontSize: 26,
+    color: "#2563eb",
+    fontWeight: "bold",
+    marginTop: -2,
+  },
+
+  exportBtn: {
+    backgroundColor: "#2563eb",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 10,
-    marginVertical: 10,
-    elevation: 2,
+  },
+
+  exportText: {
+    color: "#fff",
+    fontWeight: "700",
   },
 
   card: {
     backgroundColor: "#fff",
-    padding: 12,
-    marginBottom: 10,
-    borderRadius: 10,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
   },
 
-  cardTitle: {
-    fontWeight: "bold",
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
   },
 
-  sub: {
-    color: "#666",
+  title: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#111827",
+    marginRight: 10,
   },
 
-  detail: {
+  badge: {
+    backgroundColor: "#dbeafe",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+
+  badgeText: {
+    color: "#2563eb",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+
+  infoRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+
+  label: {
+    width: 110,
+    color: "#6b7280",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  value: {
+    flex: 1,
+    color: "#111827",
+    fontSize: 14,
+  },
+
+  footer: {
     marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+    alignItems: "flex-end",
   },
 
-  export: {
-    backgroundColor: "#27ae60",
-    padding: 8,
-    borderRadius: 6,
-    alignSelf: "flex-start",
-    marginBottom: 10,
+  viewText: {
+    color: "#2563eb",
+    fontWeight: "700",
   },
 
-  stats: {
-    backgroundColor: "#fff",
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 10,
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  section: {
-    fontWeight: "bold",
-    marginTop: 10,
-    marginBottom: 5,
+  emptyText: {
+    fontSize: 16,
+    color: "#6b7280",
   },
-
-  item: {
-    backgroundColor: "#fff",
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 5,
-  },
-
-  empty: {
-    color: "#999",
-    fontStyle: "italic",
-  },
-};
+});
