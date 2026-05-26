@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TextInput,
   StyleSheet,
   ActivityIndicator,
+  Alert
 } from "react-native";
 
 import { AuthContext } from "../../context/AuthContext";
@@ -19,16 +20,30 @@ export default function LamBaiListScreen({ navigation }) {
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const isOpen = (item) => {
+  const now = new Date();
 
+  const start = item.ThoiGianBatDau ? new Date(item.ThoiGianBatDau) : null;
+  const end = item.ThoiGianKetThuc ? new Date(item.ThoiGianKetThuc) : null;
+
+  return (!start || now >= start) && (!end || now <= end);
+};
+
+  // ================= LOAD DATA =================
   useEffect(() => {
-    load();
-  }, []);
+    if (user?.userId) {
+      load();
+    }
+  }, [user]);
 
   const load = async () => {
     try {
       setLoading(true);
-      const res = await getDeThi(user?.userId);
+
+      const res = await getDeThi(user.userId);
+
       setData(Array.isArray(res) ? res : []);
+
     } catch (err) {
       console.log("LOAD DE THI ERROR:", err.message);
       setData([]);
@@ -37,10 +52,18 @@ export default function LamBaiListScreen({ navigation }) {
     }
   };
 
-  const filtered = data.filter((x) =>
-    x?.TenDe?.toLowerCase().includes(search.toLowerCase())
-  );
+  // ================= FILTER (OPTIMIZED) =================
+  const filtered = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
 
+    if (!keyword) return data;
+
+    return data.filter((x) =>
+      x?.TenDe?.toLowerCase().includes(keyword)
+    );
+  }, [search, data]);
+
+  // ================= UI =================
   return (
     <MainLayoutSV navigation={navigation} title="📚 Danh sách đề thi">
 
@@ -58,7 +81,7 @@ export default function LamBaiListScreen({ navigation }) {
         {loading ? (
           <View style={styles.center}>
             <ActivityIndicator size="large" color="#3498db" />
-            <Text>Đang tải dữ liệu...</Text>
+            <Text style={{ marginTop: 10 }}>Đang tải dữ liệu...</Text>
           </View>
         ) : filtered.length === 0 ? (
           <View style={styles.center}>
@@ -71,44 +94,57 @@ export default function LamBaiListScreen({ navigation }) {
             contentContainerStyle={{ paddingBottom: 20 }}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
+              
               <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate("LamBaiScreen", { id: item.MaDe })
-                }
+                onPress={() => {
+                  if (!isOpen(item)) {
+                    Alert.alert("Thông báo", "Đề thi chưa mở hoặc đã hết hạn");
+                    return;
+                  }
+
+                  navigation.navigate("LamBaiScreen", { id: item.MaDe });
+                }}
                 style={styles.card}
               >
-                <Text style={styles.title}>📘 {item.TenDe}</Text>
+
+                <Text style={styles.title}>
+                  📘 {item.TenDe}
+                </Text>
 
                 <Text style={styles.sub}>
                   👥 Lớp: {item.TenNhom || "Không có lớp"}
                 </Text>
 
+                {/* optional info */}
+                <Text style={styles.meta}>
+                  ⏱ Thời gian: {item.ThoiGianThi || 0} phút
+                </Text>
+
+                <Text style={styles.meta}>
+                  🔁 Lượt làm: {item.SoLanLamToiDa || "Không giới hạn"}
+                </Text>
+
                 <View style={styles.btn}>
                   <Text style={styles.btnText}>Làm bài →</Text>
                 </View>
+
               </TouchableOpacity>
             )}
           />
         )}
+
       </View>
 
     </MainLayoutSV>
   );
 }
 
-
+// ================= STYLE =================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 15,
     backgroundColor: "#f4f6f9",
-  },
-
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-    color: "#2c3e50",
   },
 
   search: {
@@ -138,7 +174,13 @@ const styles = StyleSheet.create({
   sub: {
     fontSize: 13,
     color: "#666",
-    marginBottom: 10,
+    marginBottom: 5,
+  },
+
+  meta: {
+    fontSize: 12,
+    color: "#888",
+    marginBottom: 3,
   },
 
   btn: {
@@ -146,6 +188,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     alignItems: "center",
+    marginTop: 10,
   },
 
   btnText: {

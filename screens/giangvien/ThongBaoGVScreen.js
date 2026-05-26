@@ -16,8 +16,6 @@ import {
   useWindowDimensions,
 } from "react-native";
 
-import * as DocumentPicker from "expo-document-picker";
-import * as ImagePicker from "expo-image-picker";
 import RenderHTML from "react-native-render-html";
 
 import MainLayout from "../../components/MainLayout";
@@ -26,12 +24,23 @@ import { API_URL } from "../../api/config";
 
 import {
   getThongBaoGV,
-  createThongBaoGV,
-  updateThongBaoGV,
+  createThongBaoGVFull,
+  editThongBaoGVFull,
   deleteThongBaoGV,
   getThongBaoGVDetail,
   getNhomGV,
-  uploadThongBaoImage,
+  getThongBaoAttachments,
+  getThongBaoGroups,
+  getNhomLabel,
+  getThongBaoId,
+  getThongBaoContent,
+  stripHtml,
+  takeThongBaoPhoto,
+  pickThongBaoImages,
+  pickThongBaoFiles,
+  createLinkAttachment,
+  removeAttachmentAt,
+  mergeAttachments,
 } from "../../api/thongbaogv";
 
 const API_ROOT = API_URL.replace(/\/$/, "");
@@ -46,6 +55,103 @@ const getFullUrl = (url) => {
   return `${API_ROOT}${url}`;
 };
 
+const isImageAttachment = (att) => {
+  if (!att) return false;
+
+  if (att.type === "image") return true;
+
+  const url = String(att.url || "").split("?")[0].toLowerCase();
+
+  return (
+    url.endsWith(".jpg") ||
+    url.endsWith(".jpeg") ||
+    url.endsWith(".png") ||
+    url.endsWith(".gif") ||
+    url.endsWith(".webp")
+  );
+};
+
+const isFileLikeUrl = (url = "") => {
+  const clean = String(url).split("?")[0].toLowerCase();
+
+  return /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar|txt|csv)$/i.test(clean);
+};
+
+const getNameFromUrl = (url = "") => {
+  try {
+    const u = new URL(getFullUrl(url));
+    const parts = u.pathname.split("/");
+    const last = parts[parts.length - 1];
+    return decodeURIComponent(last || "Liên kết");
+  } catch {
+    return "Liên kết";
+  }
+};
+
+const getAttachmentIcon = (att) => {
+  if (!att) return "📎";
+  if (att.type === "image" || isImageAttachment(att)) return "🖼";
+  if (att.type === "link") return "🔗";
+  return "📎";
+};
+
+const getItemGroups = (item) => {
+  const groups = getThongBaoGroups(item);
+
+  if (groups && groups.length > 0) return groups;
+
+  return item?.Nhom || item?.nhom || item?.Groups || item?.groups || [];
+};
+
+const extractAttachmentsFromHtml = (html = "") => {
+  if (!html) return [];
+
+  const result = [];
+
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  let imgMatch;
+
+  while ((imgMatch = imgRegex.exec(html)) !== null) {
+    const url = imgMatch[1];
+
+    if (url) {
+      result.push({
+        type: "image",
+        url,
+        name: getNameFromUrl(url),
+      });
+    }
+  }
+
+  const linkRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi;
+  let linkMatch;
+
+  while ((linkMatch = linkRegex.exec(html)) !== null) {
+    const url = linkMatch[1];
+    const text = String(linkMatch[2] || "")
+      .replace(/<[^>]*>/g, "")
+      .replace(/📎/g, "")
+      .trim();
+
+    if (!url) continue;
+
+    result.push({
+      type: isFileLikeUrl(url) || text.includes(".") ? "file" : "link",
+      url,
+      name: text || getNameFromUrl(url),
+    });
+  }
+
+  return result;
+};
+
+const getAllAttachments = (item) => {
+  const fromFileDinhKem = getThongBaoAttachments(item);
+  const fromOldHtml = extractAttachmentsFromHtml(getThongBaoContent(item));
+
+  return mergeAttachments(fromFileDinhKem, fromOldHtml);
+};
+
 export default function ThongBaoGVScreen({ navigation }) {
   const { user } = useContext(AuthContext);
   const { width } = useWindowDimensions();
@@ -55,6 +161,7 @@ export default function ThongBaoGVScreen({ navigation }) {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
 
@@ -70,11 +177,14 @@ export default function ThongBaoGVScreen({ navigation }) {
 
   const [selectedNhom, setSelectedNhom] = useState([]);
 
-  const [imageUrl, setImageUrl] = useState("");
-  const [linkUrl, setLinkUrl] = useState("");
+  // Đính kèm đã lưu trong DB, dùng khi sửa.
+  const [existingAttachments, setExistingAttachments] = useState([]);
 
-  const [fileUrl, setFileUrl] = useState("");
-  const [fileName, setFileName] = useState("");
+  // File/ảnh local mới chọn, chỉ upload khi bấm lưu.
+  const [selectedFiles, setSelectedFiles] = useState([]);
+
+  // Link mới thêm.
+  const [links, setLinks] = useState([]);
 
   const [linkModalVisible, setLinkModalVisible] = useState(false);
   const [linkInput, setLinkInput] = useState("");
@@ -83,8 +193,6 @@ export default function ThongBaoGVScreen({ navigation }) {
   // LẤY MÃ GIẢNG VIÊN / USER ID
   // ====================
   const getCurrentUserId = () => {
-    console.log("AUTH USER FULL:", JSON.stringify(user, null, 2));
-
     return (
       user?.userId ||
       user?.UserId ||
@@ -110,11 +218,6 @@ export default function ThongBaoGVScreen({ navigation }) {
   const loadData = async () => {
     const currentUserId = getCurrentUserId();
 
-    console.log("API_URL:", API_URL);
-    console.log("CURRENT USER ID GUI LEN API:", currentUserId);
-
-    // Khi đăng xuất, user bị xóa.
-    // Không hiện Alert lỗi nữa, chỉ reset dữ liệu.
     if (!currentUserId) {
       setList([]);
       setGroups([]);
@@ -130,17 +233,14 @@ export default function ThongBaoGVScreen({ navigation }) {
         getNhomGV(currentUserId),
       ]);
 
-      console.log("THONG BAO DATA:", tbData);
-      console.log("NHOM DATA:", nhomData);
-
       if (tbData.success) {
-        setList(tbData.data || []);
+        setList(tbData.data || tbData.Data || []);
       } else {
         Alert.alert("Lỗi", tbData.message || "Không lấy được thông báo");
       }
 
       if (nhomData.success) {
-        setGroups(nhomData.data || []);
+        setGroups(nhomData.data || nhomData.Data || []);
       } else {
         Alert.alert(
           "Lỗi",
@@ -184,7 +284,7 @@ export default function ThongBaoGVScreen({ navigation }) {
       const res = await getThongBaoGV(currentUserId, text);
 
       if (res.success) {
-        setList(res.data || []);
+        setList(res.data || res.Data || []);
       } else {
         Alert.alert("Lỗi", res.message || "Không tìm kiếm được thông báo");
       }
@@ -202,15 +302,12 @@ export default function ThongBaoGVScreen({ navigation }) {
     });
 
     setSelectedNhom([]);
-
-    setImageUrl("");
-    setLinkUrl("");
-
-    setFileUrl("");
-    setFileName("");
-
+    setExistingAttachments([]);
+    setSelectedFiles([]);
+    setLinks([]);
     setLinkInput("");
     setSelectedItem(null);
+    setSaving(false);
   };
 
   // ====================
@@ -226,13 +323,23 @@ export default function ThongBaoGVScreen({ navigation }) {
   // OPEN EDIT
   // ====================
   const openEdit = (item) => {
+    const groupsOfItem = getItemGroups(item);
+
     setSelectedItem(item);
 
     setForm({
-      noiDung: stripHtml(item.NoiDung || ""),
+      noiDung: stripHtml(getThongBaoContent(item) || ""),
     });
 
-    setSelectedNhom(item.Nhom ? item.Nhom.map((n) => n.MaNhom) : []);
+    setSelectedNhom(
+      groupsOfItem
+        .map((n) => n.MaNhom || n.maNhom)
+        .filter(Boolean)
+    );
+
+    setExistingAttachments(getAllAttachments(item));
+    setSelectedFiles([]);
+    setLinks([]);
 
     setEditMode(true);
     setModalVisible(true);
@@ -250,10 +357,10 @@ export default function ThongBaoGVScreen({ navigation }) {
     }
 
     try {
-      const res = await getThongBaoGVDetail(id, currentUserId);
+      const res = await getThongBaoGVDetail(currentUserId, id);
 
       if (res.success) {
-        setSelectedItem(res.data);
+        setSelectedItem(res.data || res.Data);
         setDetailVisible(true);
       } else {
         Alert.alert("Lỗi", res.message || "Không lấy được chi tiết");
@@ -275,125 +382,79 @@ export default function ThongBaoGVScreen({ navigation }) {
   };
 
   // ====================
-  // INSERT LINK
+  // LINK
   // ====================
   const insertLink = () => {
-    setLinkInput(linkUrl || "");
+    setLinkInput("");
     setLinkModalVisible(true);
   };
 
   const saveLink = () => {
-    if (!linkInput.trim()) {
-      Alert.alert("Thông báo", "Vui lòng nhập link");
-      return;
-    }
-
-    setLinkUrl(linkInput.trim());
-    setLinkModalVisible(false);
-  };
-
-  // ====================
-  // CHOOSE IMAGE
-  // ====================
-  const chooseImage = async () => {
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permission.granted) {
-        Alert.alert("Thông báo", "Bạn chưa cấp quyền thư viện ảnh");
+      if (!linkInput.trim()) {
+        Alert.alert("Thông báo", "Vui lòng nhập link");
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 1,
-      });
+      const att = createLinkAttachment(linkInput.trim(), linkInput.trim());
 
-      if (result.canceled) return;
+      setLinks((prev) => [...prev, att]);
+      setLinkInput("");
+      setLinkModalVisible(false);
+    } catch (err) {
+      Alert.alert("Lỗi", err.message || "Link không hợp lệ");
+    }
+  };
 
-      const image = result.assets[0];
+  // ====================
+  // CAMERA / IMAGE / FILE
+  // ====================
+  const handleTakePhoto = async () => {
+    try {
+      const photo = await takeThongBaoPhoto();
 
-      const res = await uploadThongBaoImage({
-        uri: image.uri,
-        type: image.mimeType || "image/jpeg",
-        name: image.fileName || "image.jpg",
-      });
-
-      if (res.success) {
-        setImageUrl(getFullUrl(res.url));
-      } else {
-        Alert.alert("Lỗi", res.message || "Upload ảnh thất bại");
+      if (photo) {
+        setSelectedFiles((prev) => [...prev, photo]);
       }
     } catch (err) {
-      console.log(err);
+      Alert.alert("Lỗi", err.message || "Không thể mở camera");
+    }
+  };
+
+  const chooseImage = async () => {
+    try {
+      const images = await pickThongBaoImages();
+
+      if (images.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...images]);
+      }
+    } catch (err) {
       Alert.alert("Lỗi", err.message || "Không thể chọn ảnh");
     }
   };
 
-  // ====================
-  // CHOOSE FILE
-  // ====================
   const chooseFile = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*",
-        copyToCacheDirectory: true,
-      });
+      const files = await pickThongBaoFiles();
 
-      if (result.canceled) return;
-
-      const file = result.assets[0];
-
-      const res = await uploadThongBaoImage({
-        uri: file.uri,
-        type: file.mimeType || "application/octet-stream",
-        name: file.name || "file_upload",
-      });
-
-      if (res.success) {
-        setFileUrl(getFullUrl(res.url));
-        setFileName(file.name || "file_upload");
-      } else {
-        Alert.alert("Lỗi", res.message || "Upload file thất bại");
+      if (files.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...files]);
       }
     } catch (err) {
-      console.log(err);
       Alert.alert("Lỗi", err.message || "Không thể chọn file");
     }
   };
 
-  // ====================
-  // BUILD CONTENT
-  // ====================
-  const buildContent = () => {
-    let finalContent = form.noiDung || "";
+  const removeExistingAttachment = (index) => {
+    setExistingAttachments((prev) => removeAttachmentAt(prev, index));
+  };
 
-    if (linkUrl) {
-      finalContent += `
-        <br/>
-        <a href="${linkUrl}" target="_blank">
-          ${linkUrl}
-        </a>
-      `;
-    }
+  const removeSelectedFile = (index) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
-    if (imageUrl) {
-      finalContent += `
-        <br/>
-        <img src="${imageUrl}" style="max-width:300px"/>
-      `;
-    }
-
-    if (fileUrl) {
-      finalContent += `
-        <br/>
-        <a href="${fileUrl}" target="_blank">
-          📎 ${fileName}
-        </a>
-      `;
-    }
-
-    return finalContent;
+  const removeLink = (index) => {
+    setLinks((prev) => prev.filter((_, i) => i !== index));
   };
 
   // ====================
@@ -418,15 +479,19 @@ export default function ThongBaoGVScreen({ navigation }) {
     }
 
     try {
-      const finalContent = buildContent();
+      setSaving(true);
 
       let res;
 
       if (editMode) {
-        res = await updateThongBaoGV(selectedItem.MaThongBao, {
+        res = await editThongBaoGVFull({
+          id: getThongBaoId(selectedItem),
           userId: currentUserId,
-          noiDung: finalContent,
+          noiDung: form.noiDung.trim(),
           maNhom: selectedNhom,
+          files: selectedFiles,
+          links,
+          existingAttachments,
         });
 
         if (!res.success) {
@@ -436,10 +501,12 @@ export default function ThongBaoGVScreen({ navigation }) {
 
         Alert.alert("Thành công", "Đã cập nhật thông báo");
       } else {
-        res = await createThongBaoGV({
+        res = await createThongBaoGVFull({
           userId: currentUserId,
-          noiDung: finalContent,
+          noiDung: form.noiDung.trim(),
           maNhom: selectedNhom,
+          files: selectedFiles,
+          links,
         });
 
         if (!res.success) {
@@ -455,6 +522,8 @@ export default function ThongBaoGVScreen({ navigation }) {
       loadData();
     } catch (err) {
       Alert.alert("Lỗi", err.message || "Không thể lưu thông báo");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -479,7 +548,7 @@ export default function ThongBaoGVScreen({ navigation }) {
           }
 
           try {
-            const res = await deleteThongBaoGV(item.MaThongBao, currentUserId);
+            const res = await deleteThongBaoGV(currentUserId, getThongBaoId(item));
 
             if (res.success) {
               Alert.alert("Thành công", "Đã xóa");
@@ -527,21 +596,147 @@ export default function ThongBaoGVScreen({ navigation }) {
   };
 
   // ====================
-  // REMOVE HTML
+  // ATTACHMENT RENDER
   // ====================
-  const stripHtml = (html = "") => {
-    return html
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<[^>]*>?/gm, "")
-      .replace(/&nbsp;/g, " ")
-      .trim();
+  const renderAttachmentList = (attachments = [], compact = false) => {
+    if (!attachments || attachments.length === 0) return null;
+
+    return (
+      <View style={compact ? styles.attachCompactBox : styles.attachBox}>
+        <Text style={styles.previewLabel}>
+          Đính kèm ({attachments.length})
+        </Text>
+
+        {attachments.map((att, index) => {
+          const url = getFullUrl(att.url);
+
+          if (isImageAttachment(att)) {
+            return (
+              <TouchableOpacity
+                key={`${att.url}-${index}`}
+                style={styles.attachmentItem}
+                onPress={() => Linking.openURL(url)}
+              >
+                <Image
+                  source={{ uri: url }}
+                  style={compact ? styles.attachImageSmall : styles.attachImage}
+                />
+
+                <View style={styles.attachmentTextBox}>
+                  <Text style={styles.fileName} numberOfLines={2}>
+                    🖼 {att.name || "Ảnh đính kèm"}
+                  </Text>
+                  <Text style={styles.attachHint}>Bấm để xem ảnh</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }
+
+          return (
+            <TouchableOpacity
+              key={`${att.url}-${index}`}
+              style={styles.fileButton}
+              onPress={() => Linking.openURL(url)}
+            >
+              <Text style={styles.file} numberOfLines={2}>
+                {getAttachmentIcon(att)} {att.name || att.url}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const renderEditableAttachments = () => {
+    const hasAny =
+      existingAttachments.length > 0 ||
+      selectedFiles.length > 0 ||
+      links.length > 0;
+
+    if (!hasAny) return null;
+
+    return (
+      <View style={styles.previewBox}>
+        <Text style={styles.previewLabel}>Đính kèm đã chọn</Text>
+
+        {existingAttachments.map((att, index) => (
+          <View key={`old-${att.url}-${index}`} style={styles.selectedRow}>
+            {isImageAttachment(att) ? (
+              <Image source={{ uri: getFullUrl(att.url) }} style={styles.selectedThumb} />
+            ) : (
+              <View style={styles.selectedIcon}>
+                <Text>{getAttachmentIcon(att)}</Text>
+              </View>
+            )}
+
+            <Text style={styles.selectedName} numberOfLines={2}>
+              {att.name || att.url}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.removeBtn}
+              onPress={() => removeExistingAttachment(index)}
+            >
+              <Text style={styles.removeText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        {selectedFiles.map((file, index) => (
+          <View key={`file-${file.uri}-${index}`} style={styles.selectedRow}>
+            {String(file.type || "").startsWith("image/") ? (
+              <Image source={{ uri: file.uri }} style={styles.selectedThumb} />
+            ) : (
+              <View style={styles.selectedIcon}>
+                <Text>📎</Text>
+              </View>
+            )}
+
+            <Text style={styles.selectedName} numberOfLines={2}>
+              {file.name || "File đã chọn"}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.removeBtn}
+              onPress={() => removeSelectedFile(index)}
+            >
+              <Text style={styles.removeText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        {links.map((link, index) => (
+          <View key={`link-${link.url}-${index}`} style={styles.selectedRow}>
+            <View style={styles.selectedIcon}>
+              <Text>🔗</Text>
+            </View>
+
+            <Text style={styles.selectedName} numberOfLines={2}>
+              {link.url}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.removeBtn}
+              onPress={() => removeLink(index)}
+            >
+              <Text style={styles.removeText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
+    );
   };
 
   // ====================
   // RENDER ITEM
   // ====================
   const renderItem = ({ item }) => {
-    let text = stripHtml(item.NoiDung || "");
+    const id = getThongBaoId(item);
+    const groupsOfItem = getItemGroups(item);
+    const attachments = getAllAttachments(item);
+
+    let text = stripHtml(getThongBaoContent(item) || "");
 
     if (text.length > 120) {
       text = text.substring(0, 120) + "...";
@@ -560,34 +755,24 @@ export default function ThongBaoGVScreen({ navigation }) {
         </View>
 
         <View style={styles.metaRow}>
-          <Text style={styles.date}>🕒 {formatDate(item.ThoiGianTao)}</Text>
+          <Text style={styles.date}>🕒 {formatDate(item.ThoiGianTao || item.thoiGianTao)}</Text>
         </View>
 
-        {!!item.Nhom?.length && (
+        {!!groupsOfItem?.length && (
           <View style={styles.groupBox}>
             <Text style={styles.groupLabel}>Lớp - môn</Text>
             <Text style={styles.group}>
-              👥{" "}
-              {item.Nhom.map((n) =>
-                n.TenLopMon || `${n.TenNhom} - ${n.TenMonHoc}`
-              ).join(", ")}
+              👥 {groupsOfItem.map((n) => n.TenLopMon || n.TenHienThi || getNhomLabel(n)).join(", ")}
             </Text>
           </View>
         )}
 
-        {!!item.FileDinhKem && (
-          <TouchableOpacity
-            style={styles.fileButton}
-            onPress={() => Linking.openURL(getFullUrl(item.FileDinhKem))}
-          >
-            <Text style={styles.file}>📎 Xem / tải file đính kèm</Text>
-          </TouchableOpacity>
-        )}
+        {attachments.length > 0 && renderAttachmentList(attachments, true)}
 
         <View style={styles.rowBtns}>
           <TouchableOpacity
             style={styles.detailBtn}
-            onPress={() => openDetail(item.MaThongBao)}
+            onPress={() => openDetail(id)}
           >
             <Text style={styles.btnText}>Chi tiết</Text>
           </TouchableOpacity>
@@ -606,6 +791,9 @@ export default function ThongBaoGVScreen({ navigation }) {
       </View>
     );
   };
+
+  const detailAttachments = selectedItem ? getAllAttachments(selectedItem) : [];
+  const detailText = stripHtml(getThongBaoContent(selectedItem) || "");
 
   // ====================
   // UI
@@ -638,7 +826,7 @@ export default function ThongBaoGVScreen({ navigation }) {
         ) : (
           <FlatList
             data={list}
-            keyExtractor={(item) => item.MaThongBao.toString()}
+            keyExtractor={(item) => String(getThongBaoId(item))}
             renderItem={renderItem}
             showsVerticalScrollIndicator={false}
             refreshControl={
@@ -671,17 +859,18 @@ export default function ThongBaoGVScreen({ navigation }) {
               </View>
             ) : (
               groups.map((g) => {
-                const active = selectedNhom.includes(g.MaNhom);
+                const maNhom = g.MaNhom || g.maNhom;
+                const active = selectedNhom.includes(maNhom);
 
                 return (
                   <TouchableOpacity
-                    key={g.MaNhom}
+                    key={maNhom}
                     style={[styles.groupItem, active && styles.groupActive]}
-                    onPress={() => toggleGroup(g.MaNhom)}
+                    onPress={() => toggleGroup(maNhom)}
                   >
                     <Text style={[styles.groupText, active && styles.groupTextActive]}>
                       {active ? "✅ " : "⬜ "}
-                      {g.TenLopMon || `${g.TenNhom} - ${g.TenMonHoc}`}
+                      {g.TenLopMon || g.TenHienThi || getNhomLabel(g)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -707,10 +896,16 @@ export default function ThongBaoGVScreen({ navigation }) {
             <Text style={styles.label}>Công cụ:</Text>
 
             <View style={styles.tools}>
+              <TouchableOpacity style={styles.toolBtnGreen} onPress={handleTakePhoto}>
+                <Text style={styles.toolText}>📷 Camera</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity style={styles.toolBtnBlue} onPress={insertLink}>
                 <Text style={styles.toolText}>🔗 Link</Text>
               </TouchableOpacity>
+            </View>
 
+            <View style={styles.tools}>
               <TouchableOpacity style={styles.toolBtnPurple} onPress={chooseImage}>
                 <Text style={styles.toolText}>🖼 Ảnh</Text>
               </TouchableOpacity>
@@ -720,31 +915,20 @@ export default function ThongBaoGVScreen({ navigation }) {
               </TouchableOpacity>
             </View>
 
-            {!!linkUrl && (
-              <View style={styles.previewBox}>
-                <Text style={styles.previewLabel}>Link đã thêm</Text>
-                <Text style={styles.fileName}>🔗 {linkUrl}</Text>
-              </View>
-            )}
+            {renderEditableAttachments()}
 
-            {!!imageUrl && (
-              <View style={styles.previewBox}>
-                <Text style={styles.previewLabel}>Ảnh đã thêm</Text>
-                <Image source={{ uri: imageUrl }} style={styles.preview} />
-              </View>
-            )}
-
-            {!!fileName && (
-              <View style={styles.previewBox}>
-                <Text style={styles.previewLabel}>File đã thêm</Text>
-                <Text style={styles.fileName}>📎 {fileName}</Text>
-              </View>
-            )}
-
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.btnText}>
-                {editMode ? "Lưu thay đổi" : "Tạo thông báo"}
-              </Text>
+            <TouchableOpacity
+              style={[styles.saveBtn, saving && styles.disabledBtn]}
+              onPress={handleSave}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.btnText}>
+                  {editMode ? "Lưu thay đổi" : "Tạo thông báo"}
+                </Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -753,6 +937,7 @@ export default function ThongBaoGVScreen({ navigation }) {
                 setModalVisible(false);
                 resetForm();
               }}
+              disabled={saving}
             >
               <Text style={styles.close}>Đóng</Text>
             </TouchableOpacity>
@@ -768,44 +953,38 @@ export default function ThongBaoGVScreen({ navigation }) {
             </View>
 
             <View style={styles.detailContentBox}>
-              {!!selectedItem?.NoiDung && (
+              {detailText ? (
+                <Text style={styles.detailText}>{detailText}</Text>
+              ) : selectedItem?.NoiDung ? (
                 <RenderHTML
                   contentWidth={width - 50}
-                  source={{
-                    html: selectedItem.NoiDung,
-                  }}
+                  source={{ html: selectedItem.NoiDung }}
                   baseStyle={styles.htmlBase}
                 />
+              ) : (
+                <Text style={styles.empty}>Không có nội dung</Text>
               )}
             </View>
 
             <View style={styles.detailInfoBox}>
               <Text style={styles.date}>
-                🕒 {formatDate(selectedItem?.ThoiGianTao)}
+                🕒 {formatDate(selectedItem?.ThoiGianTao || selectedItem?.thoiGianTao)}
               </Text>
 
-              {!!selectedItem?.Nhoms?.length && (
+              {!!getItemGroups(selectedItem)?.length && (
                 <>
                   <Text style={styles.label}>Lớp - môn:</Text>
 
-                  {selectedItem.Nhoms.map((n, index) => (
+                  {getItemGroups(selectedItem).map((n, index) => (
                     <Text key={index} style={styles.groupDetail}>
-                      • {n.TenLopMon || `${n.TenNhom} - ${n.TenMonHoc}`}
+                      • {n.TenLopMon || n.TenHienThi || getNhomLabel(n)}
                     </Text>
                   ))}
                 </>
               )}
 
-              {!!selectedItem?.FileDinhKem && (
-                <TouchableOpacity
-                  style={styles.fileButton}
-                  onPress={() =>
-                    Linking.openURL(getFullUrl(selectedItem.FileDinhKem))
-                  }
-                >
-                  <Text style={styles.file}>📎 Xem / tải file đính kèm</Text>
-                </TouchableOpacity>
-              )}
+              {detailAttachments.length > 0 &&
+                renderAttachmentList(detailAttachments, false)}
             </View>
 
             <TouchableOpacity
@@ -999,7 +1178,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fef3c7",
     padding: 10,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 8,
   },
 
   file: {
@@ -1121,30 +1300,44 @@ const styles = StyleSheet.create({
 
   tools: {
     flexDirection: "row",
-    marginBottom: 15,
+    marginBottom: 10,
+    gap: 9,
+  },
+
+  toolBtnGreen: {
+    flex: 1,
+    backgroundColor: "#dcfce7",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 13,
+    alignItems: "center",
   },
 
   toolBtnBlue: {
+    flex: 1,
     backgroundColor: "#dbeafe",
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderRadius: 13,
-    marginRight: 9,
+    alignItems: "center",
   },
 
   toolBtnPurple: {
+    flex: 1,
     backgroundColor: "#ede9fe",
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderRadius: 13,
-    marginRight: 9,
+    alignItems: "center",
   },
 
   toolBtnOrange: {
+    flex: 1,
     backgroundColor: "#ffedd5",
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderRadius: 13,
+    alignItems: "center",
   },
 
   toolText: {
@@ -1167,16 +1360,108 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  preview: {
-    width: "100%",
-    height: 220,
-    borderRadius: 14,
-  },
-
   fileName: {
     color: "#2563eb",
     fontWeight: "800",
     lineHeight: 22,
+  },
+
+  selectedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 9,
+    marginBottom: 8,
+  },
+
+  selectedThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    marginRight: 10,
+    backgroundColor: "#e5e7eb",
+  },
+
+  selectedIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: "#e0f2fe",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+
+  selectedName: {
+    flex: 1,
+    color: "#334155",
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+
+  removeBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#ef4444",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
+
+  removeText: {
+    color: "white",
+    fontWeight: "900",
+    fontSize: 16,
+  },
+
+  attachCompactBox: {
+    backgroundColor: "#fff",
+    marginBottom: 8,
+  },
+
+  attachBox: {
+    marginTop: 12,
+  },
+
+  attachmentItem: {
+    flexDirection: "row",
+    backgroundColor: "#f8fafc",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 9,
+    marginBottom: 8,
+  },
+
+  attachmentTextBox: {
+    flex: 1,
+    justifyContent: "center",
+  },
+
+  attachImage: {
+    width: 120,
+    height: 90,
+    borderRadius: 12,
+    marginRight: 10,
+    backgroundColor: "#e5e7eb",
+  },
+
+  attachImageSmall: {
+    width: 76,
+    height: 58,
+    borderRadius: 10,
+    marginRight: 10,
+    backgroundColor: "#e5e7eb",
+  },
+
+  attachHint: {
+    color: "#64748b",
+    fontSize: 12,
+    marginTop: 2,
   },
 
   saveBtn: {
@@ -1186,6 +1471,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 12,
     elevation: 3,
+  },
+
+  disabledBtn: {
+    opacity: 0.65,
   },
 
   closeBtn: {
@@ -1223,6 +1512,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e5edff",
     marginBottom: 15,
+  },
+
+  detailText: {
+    color: "#111827",
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "500",
   },
 
   detailInfoBox: {
@@ -1297,3 +1593,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 });
+

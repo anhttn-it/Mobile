@@ -12,6 +12,7 @@ import {
   RefreshControl,
   ScrollView,
   Linking,
+  Image,
   useWindowDimensions,
 } from "react-native";
 
@@ -26,6 +27,13 @@ import {
   getThongBaoSVDetail,
   getThongBaoSVUnreadCount,
   getNhomSV,
+  getThongBaoSVId,
+  getThongBaoSVContent,
+  getThongBaoSVTeacher,
+  getThongBaoSVGroups,
+  getNhomSVLabel,
+  stripHtmlSV,
+  parseThongBaoSVAttachments,
 } from "../../api/thongbaosv";
 
 const API_ROOT = API_URL.replace(/\/$/, "");
@@ -38,6 +46,29 @@ const getFullUrl = (url) => {
   }
 
   return `${API_ROOT}${url}`;
+};
+
+const isImageAttachment = (att) => {
+  if (!att) return false;
+
+  if (att.type === "image") return true;
+
+  const cleanUrl = String(att.url || "").split("?")[0].toLowerCase();
+
+  return (
+    cleanUrl.endsWith(".jpg") ||
+    cleanUrl.endsWith(".jpeg") ||
+    cleanUrl.endsWith(".png") ||
+    cleanUrl.endsWith(".gif") ||
+    cleanUrl.endsWith(".webp")
+  );
+};
+
+const getAttachmentIcon = (att) => {
+  if (!att) return "📎";
+  if (isImageAttachment(att)) return "🖼";
+  if (att.type === "link") return "🔗";
+  return "📎";
 };
 
 export default function ThongBaoSVScreen({ navigation }) {
@@ -61,8 +92,6 @@ export default function ThongBaoSVScreen({ navigation }) {
   // LẤY MÃ SINH VIÊN / USER ID
   // ====================
   const getCurrentUserId = () => {
-    console.log("AUTH USER FULL SV:", JSON.stringify(user, null, 2));
-
     return (
       user?.userId ||
       user?.UserId ||
@@ -85,12 +114,9 @@ export default function ThongBaoSVScreen({ navigation }) {
   // ====================
   // LOAD DATA
   // ====================
-  const loadData = async () => {
+  const loadData = async (keyword = search) => {
     const currentUserId = getCurrentUserId();
 
-    console.log("CURRENT SV ID GUI LEN API:", currentUserId);
-
-    // Khi đăng xuất thì không báo lỗi, chỉ reset màn hình
     if (!currentUserId) {
       setList([]);
       setGroups([]);
@@ -103,27 +129,23 @@ export default function ThongBaoSVScreen({ navigation }) {
       setLoading(true);
 
       const [tbData, unreadData, nhomData] = await Promise.all([
-        getThongBaoSV(currentUserId, search),
+        getThongBaoSV(currentUserId, keyword),
         getThongBaoSVUnreadCount(currentUserId),
         getNhomSV(currentUserId),
       ]);
 
-      console.log("THONG BAO SV DATA:", tbData);
-      console.log("UNREAD SV DATA:", unreadData);
-      console.log("NHOM SV DATA:", nhomData);
-
       if (tbData.success) {
-        setList(tbData.data || []);
+        setList(tbData.data || tbData.Data || []);
       } else {
         Alert.alert("Lỗi", tbData.message || "Không lấy được thông báo");
       }
 
       if (unreadData.success) {
-        setUnreadCount(unreadData.count || 0);
+        setUnreadCount(unreadData.count || unreadData.Count || 0);
       }
 
       if (nhomData.success) {
-        setGroups(nhomData.data || []);
+        setGroups(nhomData.data || nhomData.Data || []);
       }
     } catch (err) {
       Alert.alert("Lỗi", err.message || "Không thể tải thông báo");
@@ -133,7 +155,7 @@ export default function ThongBaoSVScreen({ navigation }) {
   };
 
   useEffect(() => {
-    loadData();
+    loadData("");
   }, [user]);
 
   // ====================
@@ -141,7 +163,7 @@ export default function ThongBaoSVScreen({ navigation }) {
   // ====================
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await loadData(search);
     setRefreshing(false);
   };
 
@@ -162,7 +184,7 @@ export default function ThongBaoSVScreen({ navigation }) {
       const res = await getThongBaoSV(currentUserId, text);
 
       if (res.success) {
-        setList(res.data || []);
+        setList(res.data || res.Data || []);
       } else {
         Alert.alert("Lỗi", res.message || "Không tìm kiếm được thông báo");
       }
@@ -186,11 +208,12 @@ export default function ThongBaoSVScreen({ navigation }) {
       const res = await getThongBaoSVDetail(id, currentUserId);
 
       if (res.success) {
-        setSelectedItem(res.data);
+        setSelectedItem(res.data || res.Data);
         setDetailVisible(true);
 
-        // Cập nhật lại danh sách để đổi trạng thái đã xem
-        loadData();
+        // Đánh dấu đã xem đã được backend xử lý khi gọi Detail.
+        // Cập nhật lại danh sách và số chưa đọc.
+        await loadData(search);
       } else {
         Alert.alert("Lỗi", res.message || "Không lấy được chi tiết");
       }
@@ -230,23 +253,69 @@ export default function ThongBaoSVScreen({ navigation }) {
   };
 
   // ====================
-  // REMOVE HTML
+  // RENDER ATTACHMENTS
   // ====================
-  const stripHtml = (html = "") => {
-    return html
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<[^>]*>?/gm, "")
-      .replace(/&nbsp;/g, " ")
-      .trim();
+  const renderAttachments = (item, compact = false) => {
+    const attachments = parseThongBaoSVAttachments(item);
+
+    if (!attachments || attachments.length === 0) return null;
+
+    return (
+      <View style={compact ? styles.attachCompactBox : styles.attachBox}>
+        <Text style={styles.attachTitle}>Đính kèm ({attachments.length})</Text>
+
+        {attachments.map((att, index) => {
+          const url = getFullUrl(att.url);
+
+          if (isImageAttachment(att)) {
+            return (
+              <TouchableOpacity
+                key={`${att.url}-${index}`}
+                style={styles.imageAttachItem}
+                onPress={() => Linking.openURL(url)}
+              >
+                <Image
+                  source={{ uri: url }}
+                  style={compact ? styles.attachImageSmall : styles.attachImage}
+                />
+
+                <View style={styles.attachTextBox}>
+                  <Text style={styles.attachName} numberOfLines={2}>
+                    🖼 {att.name || "Ảnh đính kèm"}
+                  </Text>
+                  <Text style={styles.attachHint}>Bấm để xem ảnh</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }
+
+          return (
+            <TouchableOpacity
+              key={`${att.url}-${index}`}
+              style={styles.fileButton}
+              onPress={() => Linking.openURL(url)}
+            >
+              <Text style={styles.fileText} numberOfLines={2}>
+                {getAttachmentIcon(att)} {att.name || att.url}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
   };
 
   // ====================
   // RENDER ITEM
   // ====================
   const renderItem = ({ item }) => {
-    const isUnread = !item.DaXem;
+    const id = getThongBaoSVId(item);
+    const isUnread = !item.DaXem && !item.daXem;
+    const teacher = getThongBaoSVTeacher(item);
+    const itemGroups = getThongBaoSVGroups(item);
+    const attachments = parseThongBaoSVAttachments(item);
 
-    let text = stripHtml(item.NoiDung || "");
+    let text = stripHtmlSV(getThongBaoSVContent(item) || "");
 
     if (text.length > 130) {
       text = text.substring(0, 130) + "...";
@@ -270,37 +339,27 @@ export default function ThongBaoSVScreen({ navigation }) {
               )}
             </View>
 
-            {!!item.TenGiangVien && (
-              <Text style={styles.teacher}>👨‍🏫 {item.TenGiangVien}</Text>
+            {!!teacher && (
+              <Text style={styles.teacher}>👨‍🏫 {teacher}</Text>
             )}
           </View>
         </View>
 
         <View style={styles.infoBox}>
-          <Text style={styles.date}>🕒 {formatDate(item.ThoiGianTao)}</Text>
+          <Text style={styles.date}>🕒 {formatDate(item.ThoiGianTao || item.thoiGianTao)}</Text>
 
-          {!!item.Nhom?.length && (
+          {!!itemGroups?.length && (
             <Text style={styles.group}>
-              🏫{" "}
-              {item.Nhom.map((n) =>
-                n.TenLopMon || `${n.TenNhom} - ${n.TenMonHoc}`
-              ).join(", ")}
+              🏫 {itemGroups.map((n) => getNhomSVLabel(n)).join(", ")}
             </Text>
           )}
         </View>
 
-        {!!item.FileDinhKem && (
-          <TouchableOpacity
-            style={styles.fileButton}
-            onPress={() => Linking.openURL(getFullUrl(item.FileDinhKem))}
-          >
-            <Text style={styles.fileText}>📎 Xem / tải file đính kèm</Text>
-          </TouchableOpacity>
-        )}
+        {attachments.length > 0 && renderAttachments(item, true)}
 
         <TouchableOpacity
           style={styles.detailBtn}
-          onPress={() => openDetail(item.MaThongBao)}
+          onPress={() => openDetail(id)}
         >
           <Text style={styles.detailBtnText}>Xem chi tiết</Text>
         </TouchableOpacity>
@@ -308,12 +367,18 @@ export default function ThongBaoSVScreen({ navigation }) {
     );
   };
 
+  const selectedTeacher = selectedItem ? getThongBaoSVTeacher(selectedItem) : "";
+  const selectedGroups = selectedItem ? getThongBaoSVGroups(selectedItem) : [];
+  const selectedText = selectedItem
+    ? stripHtmlSV(getThongBaoSVContent(selectedItem) || "")
+    : "";
+
   return (
     <MainLayoutSV navigation={navigation} title="📢 Thông báo">
       <View style={styles.container}>
         {/* SUMMARY */}
         <View style={styles.summaryCard}>
-          <View>
+          <View style={styles.summaryTextWrap}>
             <Text style={styles.summaryTitle}>Thông báo lớp của bạn</Text>
 
             <Text style={styles.summarySub}>
@@ -351,9 +416,9 @@ export default function ThongBaoSVScreen({ navigation }) {
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {groups.map((g) => (
-                <View key={g.MaNhom} style={styles.groupChip}>
+                <View key={g.MaNhom || g.maNhom} style={styles.groupChip}>
                   <Text style={styles.groupChipText}>
-                    {g.TenLopMon || `${g.TenNhom} - ${g.TenMonHoc}`}
+                    {getNhomSVLabel(g)}
                   </Text>
                 </View>
               ))}
@@ -371,7 +436,7 @@ export default function ThongBaoSVScreen({ navigation }) {
         ) : (
           <FlatList
             data={list}
-            keyExtractor={(item) => item.MaThongBao.toString()}
+            keyExtractor={(item) => String(getThongBaoSVId(item))}
             renderItem={renderItem}
             showsVerticalScrollIndicator={false}
             refreshControl={
@@ -397,7 +462,9 @@ export default function ThongBaoSVScreen({ navigation }) {
             </View>
 
             <View style={styles.detailContentBox}>
-              {!!selectedItem?.NoiDung && (
+              {selectedText ? (
+                <Text style={styles.detailText}>{selectedText}</Text>
+              ) : selectedItem?.NoiDung ? (
                 <RenderHTML
                   contentWidth={width - 50}
                   source={{
@@ -405,42 +472,35 @@ export default function ThongBaoSVScreen({ navigation }) {
                   }}
                   baseStyle={styles.htmlBase}
                 />
+              ) : (
+                <Text style={styles.empty}>Không có nội dung</Text>
               )}
             </View>
 
             <View style={styles.detailInfoBox}>
-              {!!selectedItem?.TenGiangVien && (
+              {!!selectedTeacher && (
                 <Text style={styles.teacherDetail}>
-                  👨‍🏫 Giảng viên: {selectedItem.TenGiangVien}
+                  👨‍🏫 Giảng viên: {selectedTeacher}
                 </Text>
               )}
 
               <Text style={styles.date}>
-                🕒 {formatDate(selectedItem?.ThoiGianTao)}
+                🕒 {formatDate(selectedItem?.ThoiGianTao || selectedItem?.thoiGianTao)}
               </Text>
 
-              {!!selectedItem?.Nhoms?.length && (
+              {!!selectedGroups?.length && (
                 <>
                   <Text style={styles.detailLabel}>Lớp - môn:</Text>
 
-                  {selectedItem.Nhoms.map((n, index) => (
+                  {selectedGroups.map((n, index) => (
                     <Text key={index} style={styles.groupDetail}>
-                      • {n.TenLopMon || `${n.TenNhom} - ${n.TenMonHoc}`}
+                      • {getNhomSVLabel(n)}
                     </Text>
                   ))}
                 </>
               )}
 
-              {!!selectedItem?.FileDinhKem && (
-                <TouchableOpacity
-                  style={styles.fileButton}
-                  onPress={() =>
-                    Linking.openURL(getFullUrl(selectedItem.FileDinhKem))
-                  }
-                >
-                  <Text style={styles.fileText}>📎 Xem / tải file đính kèm</Text>
-                </TouchableOpacity>
-              )}
+              {selectedItem && renderAttachments(selectedItem, false)}
             </View>
 
             <TouchableOpacity
@@ -478,6 +538,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     elevation: 4,
+  },
+
+  summaryTextWrap: {
+    flex: 1,
+    paddingRight: 12,
   },
 
   summaryTitle: {
@@ -676,11 +741,69 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 
+  attachCompactBox: {
+    marginBottom: 10,
+  },
+
+  attachBox: {
+    marginTop: 12,
+  },
+
+  attachTitle: {
+    fontWeight: "900",
+    color: "#475569",
+    marginBottom: 8,
+  },
+
+  imageAttachItem: {
+    flexDirection: "row",
+    backgroundColor: "#f8fafc",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 9,
+    marginBottom: 8,
+  },
+
+  attachImage: {
+    width: 120,
+    height: 90,
+    borderRadius: 12,
+    marginRight: 10,
+    backgroundColor: "#e5e7eb",
+  },
+
+  attachImageSmall: {
+    width: 76,
+    height: 58,
+    borderRadius: 10,
+    marginRight: 10,
+    backgroundColor: "#e5e7eb",
+  },
+
+  attachTextBox: {
+    flex: 1,
+    justifyContent: "center",
+  },
+
+  attachName: {
+    color: "#2563eb",
+    fontWeight: "900",
+    lineHeight: 20,
+  },
+
+  attachHint: {
+    color: "#64748b",
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: "600",
+  },
+
   fileButton: {
     backgroundColor: "#fef3c7",
     padding: 11,
     borderRadius: 13,
-    marginBottom: 12,
+    marginBottom: 8,
   },
 
   fileText: {
@@ -747,6 +870,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e5edff",
     marginBottom: 15,
+  },
+
+  detailText: {
+    color: "#111827",
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "500",
   },
 
   htmlBase: {

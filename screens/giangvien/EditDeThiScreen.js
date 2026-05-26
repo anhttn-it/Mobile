@@ -144,7 +144,10 @@ const [selectedLop, setSelectedLop] =
 
           TenDe: tenDe,
 
-          MaNhom: selectedLop,
+          MaNhom:
+  selectedLop?.length > 0
+    ? selectedLop[0]
+    : null,
 
           ThoiGianThi:
             parseInt(
