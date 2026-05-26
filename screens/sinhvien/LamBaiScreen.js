@@ -12,7 +12,7 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthContext } from "../../context/AuthContext";
-import { getDeThiDetail, nopBai } from "../../api/lambai";
+import { getDeThiDetail, startLamBai, nopBai } from "../../api/lambai";
 
 export default function LamBaiScreen({ route, navigation }) {
   const { user } = useContext(AuthContext);
@@ -23,15 +23,32 @@ export default function LamBaiScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  const [maKetQua, setMaKetQua] = useState(null);
+  const [startTime, setStartTime] = useState(null);
+
+  // ================= LOAD =================
   useEffect(() => {
-    load();
+    init();
   }, []);
 
-  const load = async () => {
+  const init = async () => {
     try {
       setLoading(true);
-      const res = await getDeThiDetail(id);
+
+      if (!user?.userId) {
+        Alert.alert("Lỗi", "Không tìm thấy user");
+        return;
+      }
+
+      // 1. START LÀM BÀI
+      const startRes = await startLamBai(id, user.userId);
+      setMaKetQua(startRes.MaKetQua);
+      setStartTime(startRes.StartTime);
+
+      // 2. LOAD ĐỀ
+      const res = await getDeThiDetail(id, user.userId);
       setData(res);
+
     } catch (err) {
       Alert.alert("Lỗi", err.message);
     } finally {
@@ -39,6 +56,7 @@ export default function LamBaiScreen({ route, navigation }) {
     }
   };
 
+  // ================= CHỌN ĐÁP ÁN =================
   const choose = (qid, aid) => {
     setAnswers((prev) => ({
       ...prev,
@@ -46,10 +64,13 @@ export default function LamBaiScreen({ route, navigation }) {
     }));
   };
 
+  // ================= NỘP BÀI =================
   const submit = async () => {
     try {
-      if (!user?.userId) {
-        Alert.alert("Lỗi", "Không tìm thấy user");
+      if (!user?.userId) return;
+
+      if (!maKetQua) {
+        Alert.alert("Lỗi", "Không tìm thấy mã kết quả");
         return;
       }
 
@@ -57,6 +78,7 @@ export default function LamBaiScreen({ route, navigation }) {
 
       const payload = {
         MaDe: id,
+        MaKetQua: maKetQua,
         UserId: user.userId,
         Answers: Object.keys(answers).map((q) => ({
           MaCauHoi: parseInt(q),
@@ -68,10 +90,11 @@ export default function LamBaiScreen({ route, navigation }) {
 
       Alert.alert(
         "🎉 Kết quả",
-        `Điểm: ${res.diem}/${res.tong}`
+        `Điểm: ${res.diem}/${res.tong}\nĐiểm số: ${res.DiemThi}`
       );
 
       navigation.goBack();
+
     } catch (err) {
       Alert.alert("Lỗi", err.message);
     } finally {
@@ -79,6 +102,7 @@ export default function LamBaiScreen({ route, navigation }) {
     }
   };
 
+  // ================= UI LOADING =================
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
@@ -100,7 +124,6 @@ export default function LamBaiScreen({ route, navigation }) {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      {/* HEADER */}
       <Text style={styles.title}>📝 {data.TenDe}</Text>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -140,10 +163,7 @@ export default function LamBaiScreen({ route, navigation }) {
         ))}
 
         <TouchableOpacity
-          style={[
-            styles.submitBtn,
-            submitting && { opacity: 0.6 },
-          ]}
+          style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
           onPress={submit}
           disabled={submitting}
         >
@@ -157,6 +177,7 @@ export default function LamBaiScreen({ route, navigation }) {
   );
 }
 
+// ================= STYLE =================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
